@@ -1,0 +1,568 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>F11 - Daly Helper</title>
+
+<style>
+  :root{
+    --bg:#ffffff;
+    --card:#ffffff;
+    --text:#1e1e1e;
+    --muted:#666;
+    --border:#dddddd;
+    --input:#ffffff;
+    --out:#f4f4f4;
+    --btn:#c27c2c;
+    --btnText:#ffffff;
+    --shadow: rgba(0,0,0,0.06);
+  }
+  body.dark{
+    --bg:#0f1115;
+    --card:#151923;
+    --text:#f1f3f7;
+    --muted:#a9b1c3;
+    --border:#2a3040;
+    --input:#111522;
+    --out:#111522;
+    --btn:#d08a2f;
+    --btnText:#111;
+    --shadow: rgba(0,0,0,0.28);
+  }
+
+  body{
+    font-family: Arial, sans-serif;
+    max-width: 720px;
+    margin: auto;
+    padding: 14px;
+    background: var(--bg);
+    color: var(--text);
+  }
+
+  /* Top controls */
+  .topbar{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:10px;
+    margin-bottom:12px;
+  }
+
+  .langBtns{
+    flex:0 0 auto;
+    display:flex;
+    gap:8px;
+    flex-wrap:nowrap;
+  }
+
+  .langBtn{
+    width:auto !important;
+    min-width:0;
+    display:inline-flex;
+    align-items:center;
+    gap:8px;
+    padding:8px 10px;
+    border:1px solid var(--border);
+    border-radius:12px;
+    background: color-mix(in srgb, var(--card) 88%, transparent);
+    cursor:pointer;
+    font-size:14px;
+    line-height:1;
+    white-space:nowrap;
+    user-select:none;
+    color: var(--text);
+  }
+  .langBtn.active{
+    border-color: color-mix(in srgb, var(--btn) 60%, var(--border));
+    box-shadow:0 2px 10px rgba(194,124,44,.18);
+    background: color-mix(in srgb, var(--btn) 14%, var(--card));
+  }
+
+  .toggles{
+    display:flex;
+    gap:8px;
+    flex:0 0 auto;
+  }
+
+  .toggleBtn{
+    padding:8px 10px;
+    border:1px solid var(--border);
+    border-radius:12px;
+    background: color-mix(in srgb, var(--card) 88%, transparent);
+    cursor:pointer;
+    font-size:14px;
+    color: var(--text);
+    white-space:nowrap;
+  }
+
+  @media (max-width:720px){
+    .topbar{flex-direction:column; align-items:stretch}
+    .langBtns{justify-content:center; flex-wrap:wrap}
+    .toggles{justify-content:center; flex-wrap:wrap}
+  }
+
+  h2{margin:8px 0 8px;text-align:center}
+  .muted{color:var(--muted);font-size:13px;text-align:center;margin-bottom:10px}
+
+  .box{
+    border:1px solid var(--border);
+    border-radius:14px;
+    padding:12px;
+    margin:10px 0;
+    background: var(--card);
+    box-shadow: 0 8px 20px var(--shadow);
+  }
+
+  /* Labels with game icons */
+  label{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    margin-top:12px;
+    font-weight:700;
+  }
+  label span{display:inline-block}
+
+  /* Game icons (your uploaded PNGs) */
+  .game-icon{
+    width:30px;
+    height:30px;
+    object-fit:contain;
+    vertical-align:middle;
+
+    /* improve sharpness in Chrome */
+    image-rendering: -webkit-optimize-contrast;
+    image-rendering: crisp-edges;
+
+    /* subtle depth */
+    filter: drop-shadow(0 2px 6px rgba(0,0,0,.18));
+  }
+
+  input{
+    width:100%;
+    padding:11px;
+    border:1px solid var(--border);
+    border-radius:12px;
+    font-size:16px;
+    text-align:center;
+    background: var(--input);
+    color: var(--text);
+  }
+
+  .actions{
+    display:flex;
+    gap:10px;
+    margin-top:12px;
+    flex-wrap:wrap;
+  }
+
+  button.primary{
+    flex: 1 1 220px;
+    padding:12px;
+    border:0;
+    border-radius:12px;
+    background: var(--btn);
+    color: var(--btnText);
+    font-size:16px;
+    cursor:pointer;
+  }
+
+  button.secondary{
+    flex: 1 1 180px;
+    padding:12px;
+    border:1px solid var(--border);
+    border-radius:12px;
+    background: color-mix(in srgb, var(--card) 92%, transparent);
+    color: var(--text);
+    font-size:16px;
+    cursor:pointer;
+  }
+
+  .out{
+    background: var(--out);
+    border:1px solid color-mix(in srgb, var(--border) 75%, transparent);
+    border-radius:14px;
+    padding:12px;
+    margin-top:12px;
+    white-space:pre-wrap;
+    position: relative;
+    overflow:hidden;
+    transform: translateZ(0);
+  }
+
+  /* result animation */
+  .out.flash::before{
+    content:"";
+    position:absolute; inset:-60%;
+    background: radial-gradient(circle at 30% 30%, rgba(255,255,255,0.22), transparent 45%);
+    animation: pop 550ms ease-out;
+    pointer-events:none;
+  }
+  @keyframes pop{
+    from{transform: scale(0.8); opacity:0.0}
+    to{transform: scale(1.0); opacity:1.0}
+  }
+
+  .pill{
+    display:inline-block;
+    padding:3px 10px;
+    border:1px solid var(--border);
+    border-radius:999px;
+    font-size:12px;
+    margin:4px 3px;
+    color: var(--text);
+    background: color-mix(in srgb, var(--card) 92%, transparent);
+  }
+
+  /* F11 signature */
+  .signature{
+    margin-top:18px;
+    text-align:center;
+    font-size:14px;
+    padding:12px;
+    border-radius:14px;
+    background:linear-gradient(135deg,#1e1e1e,#2b2b2b);
+    color:#cfcfcf;
+    box-shadow:0 10px 22px rgba(0,0,0,0.18);
+  }
+  .signature span{
+    font-weight:bold;
+    font-size:16px;
+    background:linear-gradient(45deg,#ffcc70,#ff8c00);
+    -webkit-background-clip:text;
+    -webkit-text-fill-color:transparent;
+    letter-spacing:2px;
+  }
+</style>
+</head>
+
+<body>
+
+<div class="topbar">
+  <div class="langBtns" role="group" aria-label="Language">
+    <button class="langBtn" type="button" id="btn-ar" onclick="setLang('ar')">🇸🇦 العربية</button>
+    <button class="langBtn" type="button" id="btn-en" onclick="setLang('en')">🇺🇸 English</button>
+    <button class="langBtn" type="button" id="btn-pt" onclick="setLang('pt')">🇧🇷 Português</button>
+  </div>
+
+  <div class="toggles">
+    <button class="toggleBtn" type="button" id="darkBtn" onclick="toggleDark()">🌙 Dark</button>
+  </div>
+</div>
+
+<h2 id="title">أفضل نوعين للهجوم + النسبة المثالية</h2>
+
+<div class="muted" id="hint">
+  اكتب مثل: <span class="pill">360k</span> <span class="pill">1.1m</span>
+</div>
+
+<div class="box">
+  <label id="lblSni">
+    <img src="sniper.png" class="game-icon" alt="sniper">
+    <span>قناص دالي</span>
+  </label>
+  <input id="enSni" type="text" placeholder="مثال: 360k" />
+
+  <label id="lblInf">
+    <img src="fighter.png" class="game-icon" alt="fighter">
+    <span>مقاتل دالي</span>
+  </label>
+  <input id="enInf" type="text" placeholder="مثال: 360k" />
+
+  <label id="lblCav">
+    <img src="cavalry.png" class="game-icon" alt="cavalry">
+    <span>جوال دالي</span>
+  </label>
+  <input id="enCav" type="text" placeholder="مثال: 1.1m" />
+
+  <div class="actions">
+    <button class="primary" onclick="calc()" id="calcBtn">اعطني أفضل نوعين + النسبة</button>
+    <button class="secondary" onclick="copyResult()" id="copyBtn">📋 نسخ النتيجة</button>
+  </div>
+
+  <div id="out" class="out">ادخل الأرقام واضغط الزر.</div>
+</div>
+
+<div class="signature" id="sig">
+  تم إنشاء هذا المساعد بواسطة <span>F11</span>
+</div>
+
+<script>
+/* ================== Translations ================== */
+const T = {
+  ar: {
+    title: "أفضل نوعين للهجوم + النسبة المثالية",
+    hintPrefix: "اكتب مثل:",
+    lblSni: "قناص دالي",
+    lblInf: "مقاتل دالي",
+    lblCav: "جوال دالي",
+    phSni: "مثال: 360k",
+    phInf: "مثال: 360k",
+    phCav: "مثال: 1.1m",
+    btn: "اعطني أفضل نوعين + النسبة",
+    copy: "📋 نسخ النتيجة",
+    copied: "✅ تم النسخ!",
+    outIdle: "ادخل الأرقام واضغط الزر.",
+    err: "أدخل قوات دالي أولاً.",
+    headerEnemy: "📌 دالي:",
+    sni: "قناص",
+    inf: "مقاتل",
+    cav: "جوال",
+    bestLine: "✅ الأفضل للهجوم:",
+    best: "✅ أفضل نوعين للهجوم:",
+    reason1: "سبب سريع:",
+    reason2: "أكبر نوع عند دالي هو",
+    reason3: "→ أفضل كونتر له هو",
+    reason4: "ونضيف",
+    reason5: "لأنه يعالج النوع الذي يقيد",
+    sig: "تم إنشاء هذا المساعد بواسطة",
+    dark: "🌙 داكن",
+    light: "☀️ فاتح"
+  },
+  en: {
+    title: "Best Two Types + Ideal Ratio",
+    hintPrefix: "Type like:",
+    lblSni: "Daly Snipers",
+    lblInf: "Daly Fighters",
+    lblCav: "Daly Cavalry",
+    phSni: "e.g. 360k",
+    phInf: "e.g. 360k",
+    phCav: "e.g. 1.1m",
+    btn: "Get best two types + ratio",
+    copy: "📋 Copy result",
+    copied: "✅ Copied!",
+    outIdle: "Enter numbers and press the button.",
+    err: "Please enter Daly camp troops first.",
+    headerEnemy: "📌 Daly Camp:",
+    sni: "Snipers",
+    inf: "Fighters",
+    cav: "Cavalry",
+    bestLine: "✅ Best attack:",
+    best: "✅ Best two types to attack:",
+    reason1: "Quick reason:",
+    reason2: "Largest enemy type is",
+    reason3: "→ best counter is",
+    reason4: "We add",
+    reason5: "because it counters the type that beats",
+    sig: "This helper was created by",
+    dark: "🌙 Dark",
+    light: "☀️ Light"
+  },
+  pt: {
+    title: "Melhores Dois Tipos + Proporção Ideal",
+    hintPrefix: "Digite assim:",
+    lblSni: "Atiradores (Daly)",
+    lblInf: "Lutadores (Daly)",
+    lblCav: "Cavalaria (Daly)",
+    phSni: "ex: 360k",
+    phInf: "ex: 360k",
+    phCav: "ex: 1.1m",
+    btn: "Obter 2 melhores tipos + proporção",
+    copy: "📋 Copiar resultado",
+    copied: "✅ Copiado!",
+    outIdle: "Insira os números e pressione o botão.",
+    err: "Insira primeiro as tropas do acampamento Daly.",
+    headerEnemy: "📌 Acampamento Daly:",
+    sni: "Atiradores",
+    inf: "Lutadores",
+    cav: "Cavalaria",
+    bestLine: "✅ Melhor ataque:",
+    best: "✅ Melhores 2 tipos para atacar:",
+    reason1: "Motivo rápido:",
+    reason2: "O maior tipo inimigo é",
+    reason3: "→ o melhor contra é",
+    reason4: "Adicionamos",
+    reason5: "porque ele countera o tipo que vence",
+    sig: "Este assistente foi criado por",
+    dark: "🌙 Escuro",
+    light: "☀️ Claro"
+  }
+};
+
+let LANG = "ar";
+let LAST_COPY_TEXT = "";
+
+/* ===== Language UI ===== */
+function setActiveBtn(lang){
+  ["ar","en","pt"].forEach(l=>{
+    const el = document.getElementById("btn-"+l);
+    if(el) el.classList.toggle("active", l===lang);
+  });
+}
+
+function setLang(lang){
+  LANG = lang;
+  localStorage.setItem("F11_LANG", lang);
+  const t = T[lang];
+
+  document.getElementById("title").innerText = t.title;
+  document.getElementById("hint").innerHTML =
+    `${t.hintPrefix} <span class="pill">360k</span> <span class="pill">1.1m</span>`;
+
+  // Label text spans
+  document.querySelector("#lblSni span").innerText = t.lblSni;
+  document.querySelector("#lblInf span").innerText = t.lblInf;
+  document.querySelector("#lblCav span").innerText = t.lblCav;
+
+  document.getElementById("enSni").placeholder = t.phSni;
+  document.getElementById("enInf").placeholder = t.phInf;
+  document.getElementById("enCav").placeholder = t.phCav;
+
+  document.getElementById("calcBtn").innerText = t.btn;
+  document.getElementById("copyBtn").innerText = t.copy;
+
+  // signature translated
+  document.getElementById("sig").innerHTML = `${t.sig} <span>F11</span>`;
+
+  // translate idle output if still idle
+  const out = document.getElementById("out").innerText.trim();
+  if(out === T.ar.outIdle || out === T.en.outIdle || out === T.pt.outIdle){
+    document.getElementById("out").innerText = t.outIdle;
+  }
+
+  document.documentElement.dir = (lang === "ar") ? "rtl" : "ltr";
+  document.documentElement.lang = lang;
+
+  refreshDarkButtonText();
+  setActiveBtn(lang);
+}
+
+/* ===== Dark mode ===== */
+function refreshDarkButtonText(){
+  const t = T[LANG];
+  const isDark = document.body.classList.contains("dark");
+  document.getElementById("darkBtn").innerText = isDark ? t.light : t.dark;
+}
+function toggleDark(){
+  document.body.classList.toggle("dark");
+  localStorage.setItem("F11_DARK", document.body.classList.contains("dark") ? "1" : "0");
+  refreshDarkButtonText();
+}
+
+/* ================== Core logic ================== */
+function parseNum(v){
+  v = (v||"").toString().toLowerCase().trim().replace(/,/g,"");
+  if(v.endsWith("k")) return (parseFloat(v)||0) * 1000;
+  if(v.endsWith("m")) return (parseFloat(v)||0) * 1000000;
+  return parseFloat(v)||0;
+}
+
+// Circle (from your screenshot):
+// cav beats sni, sni beats inf, inf beats cav
+const counterOf = { sni:"cav", inf:"sni", cav:"inf" };
+const beatenBy  = { cav:"inf", sni:"cav", inf:"sni" };
+
+function pct(x){ return Math.round(x*100); }
+
+function typeText(type){
+  const t = T[LANG];
+  if(type==="sni") return t.sni;
+  if(type==="inf") return t.inf;
+  return t.cav;
+}
+
+function calc(){
+  const en = {
+    sni: parseNum(document.getElementById("enSni").value),
+    inf: parseNum(document.getElementById("enInf").value),
+    cav: parseNum(document.getElementById("enCav").value),
+  };
+  const total = en.sni + en.inf + en.cav;
+  const t = T[LANG];
+
+  if(total <= 0){
+    showOut(t.err, "");
+    return;
+  }
+
+  // Major threat
+  let major = "sni";
+  if(en.inf > en[major]) major = "inf";
+  if(en.cav > en[major]) major = "cav";
+
+  // Main counter A
+  const A = counterOf[major];
+
+  // Danger to A and second pick B
+  const danger = beatenBy[A];
+  const B = counterOf[danger];
+
+  // Smart ratio based on danger size
+  const dangerRatio = en[danger] / total;
+  let aShare;
+  if(dangerRatio < 0.18) aShare = 0.80;
+  else if(dangerRatio < 0.30) aShare = 0.70;
+  else if(dangerRatio < 0.45) aShare = 0.65;
+  else aShare = 0.60;
+
+  if(B === A) aShare = 1.0;
+  const bShare = Math.max(0, 1 - aShare);
+
+  // Copy line (simple)
+  LAST_COPY_TEXT = `${typeText(A)} ${pct(aShare)}% + ${typeText(B)} ${pct(bShare)}%`;
+
+  const out =
+`${t.headerEnemy}
+${t.sni}: ${en.sni.toLocaleString()}
+${t.inf}: ${en.inf.toLocaleString()}
+${t.cav}: ${en.cav.toLocaleString()}
+
+${t.bestLine} ${LAST_COPY_TEXT}
+
+${t.best}
+1) ${typeText(A)} = ${pct(aShare)}%
+2) ${typeText(B)} = ${pct(bShare)}%
+
+${t.reason1}
+${t.reason2} ${typeText(major)} ${t.reason3} ${typeText(A)}.
+${t.reason4} ${typeText(B)} ${t.reason5} ${typeText(A)}.`;
+
+  showOut(out, LAST_COPY_TEXT);
+}
+
+function showOut(text, copyLine){
+  const outEl = document.getElementById("out");
+  outEl.classList.remove("flash");
+  outEl.innerText = text;
+  requestAnimationFrame(()=> outEl.classList.add("flash"));
+  if(!copyLine) LAST_COPY_TEXT = "";
+}
+
+/* ===== Copy result ===== */
+async function copyResult(){
+  const t = T[LANG];
+  const text = LAST_COPY_TEXT || document.getElementById("out").innerText.trim();
+  if(!text) return;
+
+  try{
+    await navigator.clipboard.writeText(text);
+    const btn = document.getElementById("copyBtn");
+    btn.innerText = t.copied;
+    setTimeout(()=> btn.innerText = t.copy, 900);
+  }catch(e){
+    const ta = document.createElement("textarea");
+    ta.value = text;
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand("copy");
+    document.body.removeChild(ta);
+    const btn = document.getElementById("copyBtn");
+    btn.innerText = t.copied;
+    setTimeout(()=> btn.innerText = t.copy, 900);
+  }
+}
+
+/* ===== init ===== */
+(function init(){
+  const savedLang = localStorage.getItem("F11_LANG");
+  setLang(savedLang || "ar");
+
+  const savedDark = localStorage.getItem("F11_DARK");
+  if(savedDark === "1") document.body.classList.add("dark");
+  refreshDarkButtonText();
+})();
+</script>
+
+</body>
+</html>
