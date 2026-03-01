@@ -3,237 +3,207 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>F11 - Daly Helper</title>
+<title>Daly Alpha</title>
+<!-- إعدادات تطبيق الهاتف (PWA) -->
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#f59e0b">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Daly Alpha">
+<link rel="apple-touch-icon" href="camp.png">
+
+<!-- خط تجوال -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800;900&display=swap" rel="stylesheet">
+
+<!-- تحميل مكتبة الذكاء الاصطناعي -->
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js" async defer></script>
 
 <style>
-  :root{
-    --bg:#ffffff;
-    --card:#ffffff;
-    --text:#1e1e1e;
-    --muted:#666;
-    --border:#dddddd;
-    --input:#ffffff;
-    --out:#f4f4f4;
-    --btn:#c27c2c;
-    --btnText:#ffffff;
-    --shadow: rgba(0,0,0,0.06);
+  :root {
+    --bg: #f8f9fa;
+    --card: #ffffff;
+    --text: #2b2d42;
+    --muted: #8d99ae;
+    --border: #e2e8f0;
+    --input: #f1f5f9;
+    --input-focus: #ffffff;
+    --out: #f8fafc;
+    --btn: #d97706;
+    --btn-hover: #b45309;
+    --btnText: #ffffff;
+    --shadow: rgba(0, 0, 0, 0.05);
+    --shadow-hover: rgba(0, 0, 0, 0.1);
+    --primary-glow: rgba(217, 119, 6, 0.2);
+    --error-bg: #fee2e2;
+    --error-text: #b91c1c;
+    --error-border: #fca5a5;
   }
-  body.dark{
-    --bg:#0f1115;
-    --card:#151923;
-    --text:#f1f3f7;
-    --muted:#a9b1c3;
-    --border:#2a3040;
-    --input:#111522;
-    --out:#111522;
-    --btn:#d08a2f;
-    --btnText:#111;
-    --shadow: rgba(0,0,0,0.28);
-  }
-
-  body{
-    font-family: Arial, sans-serif;
-    max-width: 720px;
-    margin: auto;
-    padding: 14px;
-    background: var(--bg);
-    color: var(--text);
-  }
-
-  /* Top controls */
-  .topbar{
-    display:flex;
-    align-items:center;
-    justify-content:space-between;
-    gap:10px;
-    margin-bottom:12px;
+  
+  body.dark {
+    --bg: #0f1115;
+    --card: #1a1d24;
+    --text: #f1f5f9;
+    --muted: #94a3b8;
+    --border: #2a3040;
+    --input: #111522;
+    --input-focus: #1e2538;
+    --out: #111522;
+    --btn: #f59e0b;
+    --btn-hover: #fbbf24;
+    --btnText: #111827;
+    --shadow: rgba(0, 0, 0, 0.3);
+    --shadow-hover: rgba(0, 0, 0, 0.5);
+    --primary-glow: rgba(245, 158, 11, 0.15);
+    --error-bg: #450a0a;
+    --error-text: #fecaca;
+    --error-border: #991b1b;
   }
 
-  .langBtns{
-    flex:0 0 auto;
-    display:flex;
-    gap:8px;
-    flex-wrap:nowrap;
-  }
+  body { font-family: 'Tajawal', Arial, sans-serif; max-width: 760px; margin: auto; padding: 20px 14px; background: var(--bg); color: var(--text); transition: background-color 0.3s ease, color 0.3s ease; }
 
-  .langBtn{
-    width:auto !important;
-    min-width:0;
-    display:inline-flex;
-    align-items:center;
-    gap:8px;
-    padding:8px 10px;
-    border:1px solid var(--border);
-    border-radius:12px;
-    background: color-mix(in srgb, var(--card) 88%, transparent);
-    cursor:pointer;
-    font-size:14px;
-    line-height:1;
-    white-space:nowrap;
-    user-select:none;
-    color: var(--text);
-  }
-  .langBtn.active{
-    border-color: color-mix(in srgb, var(--btn) 60%, var(--border));
-    box-shadow:0 2px 10px rgba(194,124,44,.18);
-    background: color-mix(in srgb, var(--btn) 14%, var(--card));
-  }
+  .topbar { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 24px; position: relative; z-index: 5; }
+  .langBtns { display: flex; gap: 8px; background: var(--card); padding: 6px; border-radius: 16px; box-shadow: 0 2px 10px var(--shadow); border: 1px solid var(--border); }
+  .langBtn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 14px; border: none; border-radius: 10px; background: transparent; cursor: pointer; font-size: 14px; font-weight: 700; font-family: inherit; color: var(--muted); transition: all 0.2s ease; }
+  .langBtn:hover { color: var(--text); background: var(--input); }
+  .langBtn.active { background: var(--btn); color: var(--btnText); box-shadow: 0 4px 12px var(--primary-glow); }
+  .toggles { display: flex; }
+  .toggleBtn { padding: 10px 18px; border: 1px solid var(--border); border-radius: 14px; background: var(--card); cursor: pointer; font-size: 14px; font-weight: 700; font-family: inherit; color: var(--text); box-shadow: 0 2px 10px var(--shadow); transition: all 0.2s ease; }
+  .toggleBtn:hover { transform: translateY(-2px); box-shadow: 0 6px 15px var(--shadow-hover); }
 
-  .toggles{
-    display:flex;
-    gap:8px;
-    flex:0 0 auto;
-  }
+  @media (max-width: 720px) { .topbar { flex-direction: column; align-items: stretch; } .langBtns { justify-content: center; flex-wrap: wrap; } .toggles { justify-content: center; flex-wrap: wrap; } }
 
-  .toggleBtn{
-    padding:8px 10px;
-    border:1px solid var(--border);
-    border-radius:12px;
-    background: color-mix(in srgb, var(--card) 88%, transparent);
-    cursor:pointer;
-    font-size:14px;
-    color: var(--text);
-    white-space:nowrap;
-  }
+  .hero-container { text-align: center; margin: 15px auto 35px auto; display: flex; justify-content: center; align-items: center; position: relative; z-index: 1; }
+  .hero-container::before { content: ""; position: absolute; width: 220px; height: 220px; background: radial-gradient(circle, var(--primary-glow) 0%, transparent 65%); border-radius: 50%; z-index: -1; animation: pulseGlow 3s infinite alternate ease-in-out; filter: blur(15px); pointer-events: none; }
+  .hero-image { max-width: 260px; height: auto; object-fit: contain; filter: drop-shadow(0 20px 30px rgba(0,0,0,0.3)); transition: transform 0.4s ease, filter 0.4s ease; animation: floatCamp 4s ease-in-out infinite; pointer-events: none; }
+  @keyframes floatCamp { 0% { transform: translateY(0px); } 50% { transform: translateY(-12px); } 100% { transform: translateY(0px); } }
+  @keyframes pulseGlow { from { transform: scale(0.85); opacity: 0.6; } to { transform: scale(1.2); opacity: 1; } }
 
-  @media (max-width:720px){
-    .topbar{flex-direction:column; align-items:stretch}
-    .langBtns{justify-content:center; flex-wrap:wrap}
-    .toggles{justify-content:center; flex-wrap:wrap}
-  }
-
-  h2{margin:8px 0 8px;text-align:center}
-  .muted{color:var(--muted);font-size:13px;text-align:center;margin-bottom:10px}
-
-  .box{
-    border:1px solid var(--border);
-    border-radius:14px;
-    padding:12px;
-    margin:10px 0;
-    background: var(--card);
-    box-shadow: 0 8px 20px var(--shadow);
-  }
-
-  /* Labels with game icons */
-  label{
-    display:flex;
-    align-items:center;
-    gap:10px;
-    margin-top:12px;
-    font-weight:700;
-  }
-  label span{display:inline-block}
-
-  /* Game icons (your uploaded PNGs) */
-  .game-icon{
-    width:30px;
-    height:30px;
-    object-fit:contain;
-    vertical-align:middle;
-
-    /* improve sharpness in Chrome */
-    image-rendering: -webkit-optimize-contrast;
-    image-rendering: crisp-edges;
-
-    /* subtle depth */
-    filter: drop-shadow(0 2px 6px rgba(0,0,0,.18));
-  }
-
-  input{
-    width:100%;
-    padding:11px;
-    border:1px solid var(--border);
-    border-radius:12px;
-    font-size:16px;
-    text-align:center;
-    background: var(--input);
-    color: var(--text);
-  }
-
-  .actions{
-    display:flex;
-    gap:10px;
-    margin-top:12px;
-    flex-wrap:wrap;
-  }
-
-  button.primary{
-    flex: 1 1 220px;
-    padding:12px;
-    border:0;
-    border-radius:12px;
-    background: var(--btn);
-    color: var(--btnText);
-    font-size:16px;
-    cursor:pointer;
-  }
-
-  button.secondary{
-    flex: 1 1 180px;
-    padding:12px;
-    border:1px solid var(--border);
-    border-radius:12px;
-    background: color-mix(in srgb, var(--card) 92%, transparent);
-    color: var(--text);
-    font-size:16px;
-    cursor:pointer;
-  }
-
-  .out{
-    background: var(--out);
-    border:1px solid color-mix(in srgb, var(--border) 75%, transparent);
-    border-radius:14px;
-    padding:12px;
-    margin-top:12px;
-    white-space:pre-wrap;
+  /* تنسيق شعار Daly Alpha الاحترافي الجديد الفخم */
+  h2#title {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    margin: 5px 0 25px;
     position: relative;
-    overflow:hidden;
-    transform: translateZ(0);
+    z-index: 2;
   }
-
-  /* result animation */
-  .out.flash::before{
-    content:"";
-    position:absolute; inset:-60%;
-    background: radial-gradient(circle at 30% 30%, rgba(255,255,255,0.22), transparent 45%);
-    animation: pop 550ms ease-out;
-    pointer-events:none;
-  }
-  @keyframes pop{
-    from{transform: scale(0.8); opacity:0.0}
-    to{transform: scale(1.0); opacity:1.0}
-  }
-
-  .pill{
-    display:inline-block;
-    padding:3px 10px;
-    border:1px solid var(--border);
-    border-radius:999px;
-    font-size:12px;
-    margin:4px 3px;
+  .daly-text {
+    font-size: 40px;
+    font-weight: 900;
     color: var(--text);
-    background: color-mix(in srgb, var(--card) 92%, transparent);
+    letter-spacing: -0.5px;
+    line-height: 1;
+    text-shadow: 0 4px 15px var(--shadow);
+  }
+  .alpha-badge {
+    position: relative;
+    font-size: 14px;
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: 3px;
+    padding: 6px 12px 6px 15px; 
+    border-radius: 12px;
+    background: linear-gradient(135deg, var(--btn), var(--btn-hover));
+    color: var(--btnText);
+    box-shadow: 0 6px 20px var(--primary-glow), 
+                inset 0 2px 4px rgba(255,255,255,0.4), 
+                inset 0 -2px 6px rgba(0,0,0,0.2);
+    overflow: hidden;
+    display: inline-flex;
+    align-items: center;
+    line-height: 1;
+    font-family: 'Arial', sans-serif;
+  }
+  .alpha-badge::before {
+    content: '';
+    position: absolute;
+    top: 0; left: -100%;
+    width: 60%; height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.6), transparent);
+    transform: skewX(-20deg);
+    animation: badgeShine 3.5s infinite ease-in-out;
+  }
+  @keyframes badgeShine {
+    0% { left: -100%; }
+    20% { left: 200%; }
+    100% { left: 200%; }
   }
 
-  /* F11 signature */
-  .signature{
-    margin-top:18px;
-    text-align:center;
-    font-size:14px;
-    padding:12px;
-    border-radius:14px;
-    background:linear-gradient(135deg,#1e1e1e,#2b2b2b);
-    color:#cfcfcf;
-    box-shadow:0 10px 22px rgba(0,0,0,0.18);
-  }
-  .signature span{
-    font-weight:bold;
-    font-size:16px;
-    background:linear-gradient(45deg,#ffcc70,#ff8c00);
-    -webkit-background-clip:text;
-    -webkit-text-fill-color:transparent;
-    letter-spacing:2px;
-  }
+  .muted { color: var(--muted); font-size: 15px; text-align: center; margin-bottom: 20px; font-weight: 500; position: relative; z-index: 2; }
+
+  .box { border: 1px solid var(--border); border-radius: 24px; padding: 24px; margin: 10px 0; background: var(--card); box-shadow: 0 10px 30px var(--shadow); transition: all 0.3s ease; position: relative; z-index: 2; }
+
+  .upload-area { border: 2px dashed var(--btn); border-radius: 16px; padding: 20px; text-align: center; margin-bottom: 20px; background: var(--primary-glow); cursor: pointer; transition: all 0.3s ease; position: relative; overflow: hidden; }
+  .upload-area:hover { background: var(--btn); color: var(--btnText); }
+  .upload-area input[type="file"] { position: absolute; top: 0; left: 0; right: 0; bottom: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; z-index: 5; }
+  .upload-icon { font-size: 28px; margin-bottom: 8px; display: block; pointer-events: none; }
+  .upload-text { font-weight: 800; font-size: 15px; pointer-events: none; }
+  .upload-subtext { font-size: 12px; opacity: 0.8; margin-top: 5px; font-weight: 500; pointer-events: none; }
+  
+  .loading-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); display: none; align-items: center; justify-content: center; flex-direction: column; color: white; font-weight: bold; z-index: 999; border-radius: 24px; }
+  .spinner { width: 45px; height: 45px; border: 4px solid rgba(255,255,255,0.2); border-top-color: var(--btn); border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 15px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .inputs-container { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 20px; position: relative; z-index: 3; }
+  .input-wrapper { background: var(--input); border: 2px solid transparent; border-radius: 16px; padding: 12px; transition: all 0.3s ease; }
+  .input-wrapper:focus-within { background: var(--input-focus); border-color: var(--btn); box-shadow: 0 0 0 4px var(--primary-glow); }
+
+  label { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; font-weight: 800; font-size: 15px; color: var(--text); }
+  .game-icon { width: 36px; height: 36px; object-fit: contain; vertical-align: middle; filter: drop-shadow(0 4px 8px rgba(0,0,0,0.15)); transition: transform 0.3s ease; }
+  .input-wrapper:hover .game-icon { transform: scale(1.1) rotate(-5deg); }
+
+  input[type="text"] { width: 100%; padding: 12px; border: 1px solid var(--border); border-radius: 12px; font-size: 16px; font-weight: 700; font-family: inherit; text-align: center; background: var(--card); color: var(--text); box-sizing: border-box; transition: all 0.2s ease; }
+  input[type="text"]:focus { outline: none; border-color: var(--btn); }
+
+  .actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 10px; position: relative; z-index: 3; }
+  button { font-family: inherit; font-weight: 700; display: flex; align-items: center; justify-content: center; gap: 8px; transition: all 0.2s ease; }
+  button.primary { flex: 1 1 45%; padding: 16px; border: 0; border-radius: 16px; background: var(--btn); color: var(--btnText); font-size: 16px; cursor: pointer; box-shadow: 0 4px 15px var(--primary-glow); }
+  button.primary:hover { background: var(--btn-hover); transform: translateY(-2px); box-shadow: 0 6px 20px var(--primary-glow); }
+  button.primary.smart { background: linear-gradient(135deg, #7c5cff, #2bb4ff); box-shadow: 0 4px 15px rgba(124, 92, 255, 0.25); }
+  button.primary.smart:hover { background: linear-gradient(135deg, #6a4ce6, #1fa3e6); box-shadow: 0 6px 20px rgba(124, 92, 255, 0.35); }
+  button.secondary { flex: 1 1 30%; padding: 14px; border: 1px solid var(--border); border-radius: 14px; background: var(--card); color: var(--text); font-size: 15px; cursor: pointer; }
+  button.secondary:hover { background: var(--input); transform: translateY(-2px); border-color: var(--muted); }
+
+  .out { background: var(--out); border: 1px solid var(--border); border-radius: 16px; padding: 20px; margin-top: 20px; white-space: pre-wrap; position: relative; overflow: hidden; font-weight: 500; line-height: 1.7; font-size: 15px; transform: translateZ(0); box-shadow: inset 0 2px 10px var(--shadow); transition: all 0.3s ease; }
+  .out.error { background: var(--error-bg); color: var(--error-text); border-color: var(--error-border); box-shadow: inset 0 2px 10px rgba(220, 38, 38, 0.1); }
+  .out.flash::before { content: ""; position: absolute; inset: -60%; background: radial-gradient(circle at 50% 50%, var(--primary-glow), transparent 60%); animation: pop 600ms ease-out; pointer-events: none; }
+  @keyframes pop { from { transform: scale(0.5); opacity: 0; } 50% { opacity: 1; } to { transform: scale(1.2); opacity: 0; } }
+
+  .pill { display: inline-flex; align-items: center; justify-content: center; padding: 4px 12px; border: 1px solid var(--border); border-radius: 999px; font-size: 13px; font-weight: 700; margin: 4px 3px; color: var(--text); background: var(--card); box-shadow: 0 2px 5px var(--shadow); }
+
+  .signature { margin-top: 24px; text-align: center; font-size: 15px; padding: 16px; border-radius: 16px; background: linear-gradient(135deg, #1e1e1e, #2b2b2b); color: #cfcfcf; box-shadow: 0 10px 25px rgba(0,0,0,0.15); font-weight: 500; position: relative; z-index: 2; }
+  .signature span { font-weight: 900; font-size: 18px; background: linear-gradient(45deg, #ffcc70, #ff8c00); -webkit-background-clip: text; -webkit-text-fill-color: transparent; letter-spacing: 2px; }
+
+  .chartWrap { margin-top: 24px; display: flex; gap: 20px; align-items: stretch; justify-content: center; flex-wrap: wrap; }
+  .chartCard { flex: 0 0 auto; width: 250px; height: 250px; border-radius: 24px; border: 1px solid var(--border); background: var(--card); display: flex; align-items: center; justify-content: center; position: relative; overflow: hidden; box-shadow: inset 0 4px 15px var(--shadow), 0 10px 30px var(--shadow); }
+  canvas#chart { width: 220px; height: 220px; filter: drop-shadow(0 0 4px rgba(0,0,0,0.05)); }
+  .chartCenter { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; pointer-events: none; text-align: center; }
+  .chartCenter .ratio { font-size: 34px; font-weight: 900; letter-spacing: 1px; margin-bottom: 2px; color: var(--text); text-shadow: 0 2px 10px var(--shadow); }
+  .chartCenter .small { font-size: 13px; font-weight: 700; color: var(--muted); }
+  
+  .legend { flex: 1 1 240px; min-width: 240px; border-radius: 20px; border: 1px solid var(--border); background: var(--out); padding: 20px; display: flex; flex-direction: column; justify-content: center; box-shadow: inset 0 2px 10px var(--shadow); }
+  .legend h3 { margin: 0 0 12px 0; font-size: 15px; color: var(--muted); font-weight: 800; text-transform: uppercase; letter-spacing: 1px; }
+  .row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 12px 16px; border-radius: 14px; background: var(--card); border: 1px solid var(--border); margin: 6px 0; box-shadow: 0 4px 10px var(--shadow); transition: transform 0.2s ease; }
+  .row:hover { transform: scale(1.02); }
+  .left { display: flex; align-items: center; gap: 12px; font-weight: 800; font-size: 15px; }
+  .dot { width: 14px; height: 14px; border-radius: 999px; box-shadow: inset 0 2px 4px rgba(0,0,0,0.2), 0 0 0 3px var(--input); }
+  .pct { font-weight: 900; font-size: 18px; white-space: nowrap; }
+
+  .toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%) translateY(20px); background: var(--text); border: none; color: var(--bg); padding: 12px 24px; border-radius: 999px; box-shadow: 0 15px 30px rgba(0,0,0,0.2); opacity: 0; pointer-events: none; transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); z-index: 9999; font-size: 15px; font-weight: 700; }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  .smartBox { margin-top: 20px; padding: 20px; border-radius: 20px; background: linear-gradient(145deg, rgba(124, 92, 255, 0.08), rgba(43, 180, 255, 0.08)); border: 1px solid rgba(124, 92, 255, 0.3); text-align: start; line-height: 1.7; box-shadow: inset 0 0 20px rgba(124, 92, 255, 0.05); }
+  .smartBox h3 { margin: 0 0 8px 0; font-size: 18px; font-weight: 800; color: #7c5cff; }
+  .dark .smartBox h3 { color: #a48cff; }
+  .smartBox .muted { font-size: 14px; margin-bottom: 14px; font-weight: 500; }
+  .smartGrid { display: grid; grid-template-columns: 1fr; gap: 12px; margin-bottom: 16px; }
+  .smartBox .pill { background: var(--card); border: 1px solid rgba(124, 92, 255, 0.2); padding: 10px 16px; font-size: 14px; justify-content: flex-start; }
+  .smartWhyText { margin-top: 10px; font-size: 14px; font-weight: 500; }
+  .smartWhyText ul { margin: 8px 0; padding-inline-start: 24px; }
+  .smartWhyText li { margin-bottom: 6px; }
 </style>
 </head>
 
@@ -245,62 +215,256 @@
     <button class="langBtn" type="button" id="btn-en" onclick="setLang('en')">🇺🇸 English</button>
     <button class="langBtn" type="button" id="btn-pt" onclick="setLang('pt')">🇧🇷 Português</button>
   </div>
-
   <div class="toggles">
     <button class="toggleBtn" type="button" id="darkBtn" onclick="toggleDark()">🌙 Dark</button>
   </div>
 </div>
 
-<h2 id="title">أفضل نوعين للهجوم + النسبة المثالية</h2>
+<div class="hero-container">
+  <img src="camp.png" alt="Daly Camp" class="hero-image" onerror="this.style.display='none'">
+</div>
+
+<!-- الشعار الاحترافي الجديد -->
+<h2 id="title">
+  <span class="daly-text">Daly</span><span class="alpha-badge">ALPHA</span>
+</h2>
 
 <div class="muted" id="hint">
   اكتب مثل: <span class="pill">360k</span> <span class="pill">1.1m</span>
 </div>
 
 <div class="box">
-  <label id="lblSni">
-    <img src="sniper.png" class="game-icon" alt="sniper">
-    <span>قناص دالي</span>
-  </label>
-  <input id="enSni" type="text" placeholder="مثال: 360k" />
+  
+  <div class="loading-overlay" id="loadingOverlay">
+    <div class="spinner"></div>
+    <div id="loadingText" style="font-size: 16px; text-align:center;">🤖 جاري تحليل الأرقام بدقة عالية...</div>
+  </div>
 
-  <label id="lblInf">
-    <img src="fighter.png" class="game-icon" alt="fighter">
-    <span>مقاتل دالي</span>
-  </label>
-  <input id="enInf" type="text" placeholder="مثال: 360k" />
+  <div class="upload-area" id="uploadArea">
+    <span class="upload-icon">📸</span>
+    <div class="upload-text" id="uploadText">اضغط هنا لرفع صورة (تقرير الاستطلاع)</div>
+    <div class="upload-subtext" id="uploadSubText">سيقوم الذكاء الاصطناعي بتعبئة الأرقام تلقائياً!</div>
+    <input type="file" id="imageInput" accept="image/*" onchange="handleImageUpload(event)">
+  </div>
 
-  <label id="lblCav">
-    <img src="cavalry.png" class="game-icon" alt="cavalry">
-    <span>جوال دالي</span>
-  </label>
-  <input id="enCav" type="text" placeholder="مثال: 1.1m" />
+  <div class="inputs-container">
+    <div class="input-wrapper">
+      <label id="lblSni">
+        <img src="sniper.png" class="game-icon" alt="sniper" onerror="this.style.display='none'">
+        <span>قناص دالي</span>
+      </label>
+      <input id="enSni" type="text" placeholder="مثال: 360.0k" />
+    </div>
+
+    <div class="input-wrapper">
+      <label id="lblInf">
+        <img src="fighter.png" class="game-icon" alt="fighter" onerror="this.style.display='none'">
+        <span>مقاتل دالي</span>
+      </label>
+      <input id="enInf" type="text" placeholder="مثال: 360.0k" />
+    </div>
+
+    <div class="input-wrapper">
+      <label id="lblCav">
+        <img src="cavalry.png" class="game-icon" alt="cavalry" onerror="this.style.display='none'">
+        <span>جوال دالي</span>
+      </label>
+      <input id="enCav" type="text" placeholder="مثال: 1.1m" />
+    </div>
+  </div>
 
   <div class="actions">
-    <button class="primary" onclick="calc()" id="calcBtn">اعطني أفضل نوعين + النسبة</button>
+    <button class="primary" onclick="calc()" id="calcBtn">⚔️ اعطني أفضل نوعين + النسبة</button>
+    <button class="primary smart" onclick="smartAnalyze()" id="smartBtn">🧠 تحليل ذكي</button>
     <button class="secondary" onclick="copyResult()" id="copyBtn">📋 نسخ النتيجة</button>
+    <button class="secondary" onclick="shareResult()" id="shareBtn">🔗 مشاركة</button>
+    <button class="secondary" onclick="resetAll()" id="resetBtn">♻️ إعادة ضبط</button>
   </div>
 
   <div id="out" class="out">ادخل الأرقام واضغط الزر.</div>
+  <div id="smartBox" class="smartBox" style="display:none"></div>
+  
+  <div class="chartWrap" id="chartWrap" style="display:none">
+    <div class="chartCard">
+      <canvas id="chart" width="220" height="220"></canvas>
+      <div class="chartCenter">
+        <div class="ratio" id="ratioText">70 / 30</div>
+        <div class="small" id="ratioHint">النسبة المثالية</div>
+      </div>
+    </div>
+    <div class="legend">
+      <h3 id="legendTitle">التوصية</h3>
+      <div class="row" id="rowA">
+        <div class="left">
+          <span class="dot" id="dotA"></span>
+          <img id="iconA" class="game-icon" src="sniper.png" alt="A" style="width:28px;height:28px" onerror="this.style.display='none'">
+          <span id="nameA">قناص</span>
+        </div>
+        <div class="pct" id="pctA">70%</div>
+      </div>
+      <div class="row" id="rowB">
+        <div class="left">
+          <span class="dot" id="dotB"></span>
+          <img id="iconB" class="game-icon" src="fighter.png" alt="B" style="width:28px;height:28px" onerror="this.style.display='none'">
+          <span id="nameB">مقاتل</span>
+        </div>
+        <div class="pct" id="pctB">30%</div>
+      </div>
+    </div>
+  </div>
 </div>
 
-<div class="signature" id="sig">
-  تم إنشاء هذا المساعد بواسطة <span>F11</span>
-</div>
+<div class="signature" id="sig">تم إنشاء هذا المساعد بواسطة <span>F11</span></div>
 
 <script>
-/* ================== Translations ================== */
+/* ================== دوال حماية المتصفحات ================== */
+function safeSetStorage(key, value) {
+  try { localStorage.setItem(key, value); } catch (e) { }
+}
+function safeGetStorage(key) {
+  try { return localStorage.getItem(key); } catch (e) { return null; }
+}
+
+/* ================== دالة إظهار الخطأ المدمجة ================== */
+function showSiteError(msg) {
+    const outEl = document.getElementById("out");
+    outEl.innerText = "❌ " + msg;
+    outEl.classList.add("error");
+    outEl.classList.remove("flash");
+    requestAnimationFrame(() => outEl.classList.add("flash"));
+    toast("❌ " + ((T[LANG] || T.ar).toastError || "حدث خطأ في القراءة"));
+    hideChart();
+    document.getElementById("smartBox").style.display = "none";
+}
+
+/* ================== الذكاء الاصطناعي للصورة ================== */
+async function handleImageUpload(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    const t = T[LANG] || T.ar;
+    
+    document.getElementById("out").classList.remove("error");
+
+    if (typeof Tesseract === 'undefined') {
+        showSiteError("مكتبة الذكاء الاصطناعي لم يتم تحميلها بعد. الرجاء الانتظار قليلاً أو إدخال الأرقام يدوياً.");
+        document.getElementById("imageInput").value = ""; 
+        return;
+    }
+
+    const overlay = document.getElementById("loadingOverlay");
+    overlay.style.display = "flex";
+
+    try {
+        const img = new Image();
+        img.src = URL.createObjectURL(file);
+        
+        await new Promise((resolve, reject) => {
+            img.onload = resolve;
+            img.onerror = () => reject("فشل تحميل الصورة.");
+        });
+
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+
+        const startY = img.height * 0.20; 
+        const sliceHeight = img.height * 0.60; 
+        
+        const scale = 3; 
+        canvas.width = img.width * scale;
+        canvas.height = sliceHeight * scale;
+
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
+        ctx.drawImage(img, 0, startY, img.width, sliceHeight, 0, 0, canvas.width, canvas.height);
+
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const data = imageData.data;
+        for (let i = 0; i < data.length; i += 4) {
+            let gray = data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114;
+            gray = (gray - 128) * 1.5 + 128; 
+            data[i] = data[i + 1] = data[i + 2] = Math.min(255, Math.max(0, gray));
+        }
+        ctx.putImageData(imageData, 0, 0);
+
+        const processedImage = canvas.toDataURL('image/png');
+
+        const worker = await Tesseract.createWorker('eng');
+        await worker.setParameters({ tessedit_char_whitelist: '0123456789.,kmKM ' });
+        
+        const ret = await worker.recognize(processedImage);
+        await worker.terminate();
+
+        const words = ret.data.words;
+        let validNumbers =[];
+        
+        const numRegex = /(\d+[\.,]?\d*[km])/i;
+
+        for (let word of words) {
+            let text = word.text.toLowerCase().replace(/,/g, '.').replace(/[oO]/g, '0').replace(/[lL|]/g, '1');
+            let match = text.match(numRegex);
+            
+            if (match) {
+                validNumbers.push({
+                    text: match[1], 
+                    x: word.bbox.x0,
+                    y: word.bbox.y0
+                });
+            }
+        }
+
+        validNumbers.sort((a, b) => a.y - b.y);
+
+        let rows =[];
+        if (validNumbers.length > 0) {
+            let currentRow = [validNumbers[0]];
+            for (let i = 1; i < validNumbers.length; i++) {
+                if (Math.abs(validNumbers[i].y - currentRow[0].y) < 80) {
+                    currentRow.push(validNumbers[i]);
+                } else {
+                    rows.push(currentRow);
+                    currentRow = [validNumbers[i]];
+                }
+            }
+            rows.push(currentRow);
+        }
+
+        let targetRow = rows.find(r => r.length >= 3);
+
+        if (targetRow) {
+            targetRow.sort((a, b) => a.x - b.x);
+            
+            document.getElementById("enInf").value = targetRow[0].text; 
+            document.getElementById("enSni").value = targetRow[1].text; 
+            document.getElementById("enCav").value = targetRow[2].text; 
+            
+            toast("✅ تمت قراءة الأرقام بنجاح!");
+            setTimeout(() => smartAnalyze(), 500); 
+        } else {
+            console.log("النتائج:", validNumbers);
+            showSiteError(t.ocrFail || "لم يتمكن الذكاء من قراءة الأرقام. الرجاء التأكد أن الصورة لتقرير الاستطلاع.");
+        }
+    } catch (error) {
+        console.error(error);
+        showSiteError("حدث خطأ تقني أثناء تحليل الصورة. يرجى المحاولة مرة أخرى.");
+    } finally {
+        overlay.style.display = "none";
+        document.getElementById("imageInput").value = ""; 
+    }
+}
+
+/* ================== الترجمات (تم توحيد الشعار لجميع اللغات) ================== */
 const T = {
   ar: {
-    title: "أفضل نوعين للهجوم + النسبة المثالية",
+    title: "<span class='daly-text'>Daly</span><span class='alpha-badge'>ALPHA</span>",
     hintPrefix: "اكتب مثل:",
     lblSni: "قناص دالي",
     lblInf: "مقاتل دالي",
     lblCav: "جوال دالي",
-    phSni: "مثال: 360k",
-    phInf: "مثال: 360k",
+    phSni: "مثال: 360.0k",
+    phInf: "مثال: 360.0k",
     phCav: "مثال: 1.1m",
-    btn: "اعطني أفضل نوعين + النسبة",
+    btn: "⚔️ اعطني أفضل نوعين + النسبة",
     copy: "📋 نسخ النتيجة",
     copied: "✅ تم النسخ!",
     outIdle: "ادخل الأرقام واضغط الزر.",
@@ -318,10 +482,34 @@ const T = {
     reason5: "لأنه يعالج النوع الذي يقيد",
     sig: "تم إنشاء هذا المساعد بواسطة",
     dark: "🌙 داكن",
-    light: "☀️ فاتح"
+    light: "☀️ فاتح",
+    share: '🔗 مشاركة',
+    shared: '✅ تم إنشاء رابط!',
+    reset: '♻️ إعادة ضبط',
+    ratioHint: 'النسبة المثالية',
+    legendTitle: 'التوصية',
+    toastReset: 'تمت إعادة الضبط',
+    toastNeed: 'أدخل قوات دالي أولاً.',
+    toastError: 'حدث خطأ في القراءة',
+    enterHint: "الرجاء إدخال قوات دالي أولاً.",
+    smartTitle: "تحليل ذكي",
+    smartSub: "نظرة متعمقة على التشكيلة للحصول على أفضل النتائج",
+    smartEnemy: "قوات العدو",
+    smartRec: "التوصية الذكية",
+    smartWhy: "لماذا هذا الاختيار؟",
+    smartWhy1: "هو أفضل مضاد لـ",
+    smartWhy2: "العدو يمتلك نسبة من",
+    smartWhy3: "لذا نضيف",
+    smartWhy4: "لا توجد تهديدات ثانوية كبيرة من العدو تتطلب تغطية مكثفة.",
+    smartWhy5: "النسبة المثالية بناءً على الحسبة هي",
+    smartNote: "ملاحظة: هذه النسب تعتمد على تحليل رياضي لتقليل خسائرك للحد الأدنى.",
+    uploadText: "اضغط هنا لرفع صورة (تقرير الاستطلاع)",
+    uploadSubText: "سيقوم الذكاء الاصطناعي بتعبئة الأرقام تلقائياً!",
+    loadingText: "🤖 جاري تحليل التقرير بدقة...",
+    ocrFail: "الرجاء التأكد أن الصورة لتقرير الاستطلاع، وتكون الأرقام واضحة."
   },
   en: {
-    title: "Best Two Types + Ideal Ratio",
+    title: "<span class='daly-text'>Daly</span><span class='alpha-badge'>ALPHA</span>",
     hintPrefix: "Type like:",
     lblSni: "Daly Snipers",
     lblInf: "Daly Fighters",
@@ -329,7 +517,7 @@ const T = {
     phSni: "e.g. 360k",
     phInf: "e.g. 360k",
     phCav: "e.g. 1.1m",
-    btn: "Get best two types + ratio",
+    btn: "⚔️ Get best two types + ratio",
     copy: "📋 Copy result",
     copied: "✅ Copied!",
     outIdle: "Enter numbers and press the button.",
@@ -347,10 +535,34 @@ const T = {
     reason5: "because it counters the type that beats",
     sig: "This helper was created by",
     dark: "🌙 Dark",
-    light: "☀️ Light"
+    light: "☀️ Light",
+    share: '🔗 Share',
+    shared: '✅ Link ready!',
+    reset: '♻️ Reset',
+    ratioHint: 'Ideal ratio',
+    legendTitle: 'Recommendation',
+    toastReset: 'Reset done',
+    toastNeed: 'Enter Daly troops first.',
+    toastError: 'Failed to read image',
+    enterHint: "Please enter Daly troops first.",
+    smartTitle: "Smart Analysis",
+    smartSub: "In-depth look at the formation for best results",
+    smartEnemy: "Enemy Troops",
+    smartRec: "Smart Recommendation",
+    smartWhy: "Why this choice?",
+    smartWhy1: "is the best counter to",
+    smartWhy2: "The enemy has a good portion of",
+    smartWhy3: "so we add",
+    smartWhy4: "There are no major secondary threats requiring heavy coverage.",
+    smartWhy5: "The ideal calculated ratio is",
+    smartNote: "Note: These ratios are based on mathematical analysis to minimize your losses.",
+    uploadText: "Click here to upload a screenshot (Scout Report)",
+    uploadSubText: "AI will auto-fill the numbers for you!",
+    loadingText: "🤖 Analyzing screenshot accurately...",
+    ocrFail: "Please ensure the image is a clear scout report."
   },
   pt: {
-    title: "Melhores Dois Tipos + Proporção Ideal",
+    title: "<span class='daly-text'>Daly</span><span class='alpha-badge'>ALPHA</span>",
     hintPrefix: "Digite assim:",
     lblSni: "Atiradores (Daly)",
     lblInf: "Lutadores (Daly)",
@@ -358,7 +570,7 @@ const T = {
     phSni: "ex: 360k",
     phInf: "ex: 360k",
     phCav: "ex: 1.1m",
-    btn: "Obter 2 melhores tipos + proporção",
+    btn: "⚔️ Obter 2 melhores + proporção",
     copy: "📋 Copiar resultado",
     copied: "✅ Copiado!",
     outIdle: "Insira os números e pressione o botão.",
@@ -376,192 +588,383 @@ const T = {
     reason5: "porque ele countera o tipo que vence",
     sig: "Este assistente foi criado por",
     dark: "🌙 Escuro",
-    light: "☀️ Claro"
+    light: "☀️ Claro",
+    share: '🔗 Compartilhar',
+    shared: '✅ Link pronto!',
+    reset: '♻️ Redefinir',
+    ratioHint: 'Proporção ideal',
+    legendTitle: 'Recomendação',
+    toastReset: 'Redefinição concluída',
+    toastNeed: 'Insira as tropas Daly primeiro.',
+    toastError: 'Falha ao ler a imagem',
+    enterHint: "Insira as tropas Daly primeiro.",
+    smartTitle: "Análise Inteligente",
+    smartSub: "Visão aprofundada da formação para melhores resultados",
+    smartEnemy: "Tropas Inimigas",
+    smartRec: "Recomendação",
+    smartWhy: "Por que essa escolha?",
+    smartWhy1: "é o melhor contra-ataque para",
+    smartWhy2: "O inimigo possui uma boa parte de",
+    smartWhy3: "então adicionamos",
+    smartWhy4: "Não há grandes ameaças secundárias.",
+    smartWhy5: "A proporção ideal calculada é",
+    smartNote: "Nota: Estas proporções são baseadas em cálculos para minimizar suas perdas.",
+    uploadText: "Clique aqui para enviar captura de tela (Relatório)",
+    uploadSubText: "A IA preencherá os números automaticamente!",
+    loadingText: "🤖 Analisando imagem...",
+    ocrFail: "Certifique-se de que a imagem é um relatório de exploração claro."
   }
 };
 
 let LANG = "ar";
 let LAST_COPY_TEXT = "";
 
-/* ===== Language UI ===== */
-function setActiveBtn(lang){
-  ["ar","en","pt"].forEach(l=>{
-    const el = document.getElementById("btn-"+l);
-    if(el) el.classList.toggle("active", l===lang);
-  });
+function setActiveBtn(lang) {["ar","en","pt"].forEach(l => { 
+    const el = document.getElementById("btn-" + l); 
+    if(el) el.classList.toggle("active", l === lang); 
+  }); 
 }
 
-function setLang(lang){
-  LANG = lang;
-  localStorage.setItem("F11_LANG", lang);
+function setLang(lang) {
+  if (!T[lang]) lang = "ar"; 
+  LANG = lang; 
+  safeSetStorage("F11_LANG", lang); 
+  
   const t = T[lang];
-
-  document.getElementById("title").innerText = t.title;
-  document.getElementById("hint").innerHTML =
-    `${t.hintPrefix} <span class="pill">360k</span> <span class="pill">1.1m</span>`;
-
-  // Label text spans
+  document.getElementById("title").innerHTML = t.title;
+  document.getElementById("hint").innerHTML = `${t.hintPrefix} <span class="pill">360.0k</span> <span class="pill">1.1m</span>`;
   document.querySelector("#lblSni span").innerText = t.lblSni;
   document.querySelector("#lblInf span").innerText = t.lblInf;
   document.querySelector("#lblCav span").innerText = t.lblCav;
-
   document.getElementById("enSni").placeholder = t.phSni;
   document.getElementById("enInf").placeholder = t.phInf;
   document.getElementById("enCav").placeholder = t.phCav;
-
-  document.getElementById("calcBtn").innerText = t.btn;
-  document.getElementById("copyBtn").innerText = t.copy;
-
-  // signature translated
+  document.getElementById("calcBtn").innerHTML = t.btn;
+  document.getElementById("smartBtn").innerHTML = "🧠 " + (t.smartTitle || "Smart Analysis");
+  document.getElementById("copyBtn").innerHTML = t.copy;
+  document.getElementById("shareBtn").innerHTML = t.share;
+  document.getElementById("resetBtn").innerHTML = t.reset;
+  document.getElementById("uploadText").innerText = t.uploadText;
+  document.getElementById("uploadSubText").innerText = t.uploadSubText;
+  document.getElementById("loadingText").innerText = t.loadingText;
+  document.getElementById("ratioHint").innerText = t.ratioHint;
+  document.getElementById("legendTitle").innerText = t.legendTitle;
   document.getElementById("sig").innerHTML = `${t.sig} <span>F11</span>`;
-
-  // translate idle output if still idle
-  const out = document.getElementById("out").innerText.trim();
-  if(out === T.ar.outIdle || out === T.en.outIdle || out === T.pt.outIdle){
-    document.getElementById("out").innerText = t.outIdle;
+  
+  const outEl = document.getElementById("out");
+  const outTxt = outEl.innerText.trim();
+  if(!outEl.classList.contains("error") && (outTxt === T.ar.outIdle || outTxt === T.en.outIdle || outTxt === T.pt.outIdle)) { 
+    outEl.innerText = t.outIdle; 
   }
-
+  
   document.documentElement.dir = (lang === "ar") ? "rtl" : "ltr";
   document.documentElement.lang = lang;
-
+  
+  if(LAST_REC) showChart(LAST_REC.A, LAST_REC.B, LAST_REC.aShare, LAST_REC.bShare);
+  
   refreshDarkButtonText();
   setActiveBtn(lang);
 }
 
-/* ===== Dark mode ===== */
-function refreshDarkButtonText(){
-  const t = T[LANG];
+function refreshDarkButtonText() {
+  const t = T[LANG] || T.ar; 
   const isDark = document.body.classList.contains("dark");
   document.getElementById("darkBtn").innerText = isDark ? t.light : t.dark;
 }
-function toggleDark(){
-  document.body.classList.toggle("dark");
-  localStorage.setItem("F11_DARK", document.body.classList.contains("dark") ? "1" : "0");
-  refreshDarkButtonText();
+
+function toggleDark() {
+  try {
+    document.body.classList.toggle("dark"); 
+    safeSetStorage("F11_DARK", document.body.classList.contains("dark") ? "1" : "0");
+    refreshDarkButtonText(); 
+    if (LAST_REC) showChart(LAST_REC.A, LAST_REC.B, LAST_REC.aShare, LAST_REC.bShare);
+  } catch(e) { }
 }
 
-/* ================== Core logic ================== */
-function parseNum(v){
+function parseNum(v) {
   v = (v||"").toString().toLowerCase().trim().replace(/,/g,"");
   if(v.endsWith("k")) return (parseFloat(v)||0) * 1000;
   if(v.endsWith("m")) return (parseFloat(v)||0) * 1000000;
   return parseFloat(v)||0;
 }
 
-// Circle (from your screenshot):
-// cav beats sni, sni beats inf, inf beats cav
 const counterOf = { sni:"cav", inf:"sni", cav:"inf" };
 const beatenBy  = { cav:"inf", sni:"cav", inf:"sni" };
+function pct(x) { return Math.round(x*100); }
+function typeText(type) { const t = T[LANG]; if(type==="sni") return t.sni; if(type==="inf") return t.inf; return t.cav; }
 
-function pct(x){ return Math.round(x*100); }
-
-function typeText(type){
-  const t = T[LANG];
-  if(type==="sni") return t.sni;
-  if(type==="inf") return t.inf;
-  return t.cav;
-}
-
-function calc(){
-  const en = {
-    sni: parseNum(document.getElementById("enSni").value),
-    inf: parseNum(document.getElementById("enInf").value),
-    cav: parseNum(document.getElementById("enCav").value),
+function calc() {
+  const en = { 
+    sni: parseNum(document.getElementById("enSni").value), 
+    inf: parseNum(document.getElementById("enInf").value), 
+    cav: parseNum(document.getElementById("enCav").value) 
   };
   const total = en.sni + en.inf + en.cav;
-  const t = T[LANG];
+  const t = T[LANG] || T.ar;
+  
+  document.getElementById("smartBox").style.display = "none";
+  if(total <= 0) { showOut(t.err, ""); toast(t.toastNeed || t.err); hideChart(); return; }
 
-  if(total <= 0){
-    showOut(t.err, "");
-    return;
-  }
-
-  // Major threat
-  let major = "sni";
-  if(en.inf > en[major]) major = "inf";
+  let major = "sni"; 
+  if(en.inf > en[major]) major = "inf"; 
   if(en.cav > en[major]) major = "cav";
-
-  // Main counter A
-  const A = counterOf[major];
-
-  // Danger to A and second pick B
-  const danger = beatenBy[A];
+  
+  const A = counterOf[major]; 
+  const danger = beatenBy[A]; 
   const B = counterOf[danger];
-
-  // Smart ratio based on danger size
   const dangerRatio = en[danger] / total;
+  
   let aShare;
-  if(dangerRatio < 0.18) aShare = 0.80;
-  else if(dangerRatio < 0.30) aShare = 0.70;
-  else if(dangerRatio < 0.45) aShare = 0.65;
+  if(dangerRatio < 0.18) aShare = 0.80; 
+  else if(dangerRatio < 0.30) aShare = 0.70; 
+  else if(dangerRatio < 0.45) aShare = 0.65; 
   else aShare = 0.60;
-
+  
   if(B === A) aShare = 1.0;
   const bShare = Math.max(0, 1 - aShare);
 
-  // Copy line (simple)
   LAST_COPY_TEXT = `${typeText(A)} ${pct(aShare)}% + ${typeText(B)} ${pct(bShare)}%`;
-
-  const out =
-`${t.headerEnemy}
-${t.sni}: ${en.sni.toLocaleString()}
-${t.inf}: ${en.inf.toLocaleString()}
-${t.cav}: ${en.cav.toLocaleString()}
-
-${t.bestLine} ${LAST_COPY_TEXT}
-
-${t.best}
-1) ${typeText(A)} = ${pct(aShare)}%
-2) ${typeText(B)} = ${pct(bShare)}%
-
-${t.reason1}
-${t.reason2} ${typeText(major)} ${t.reason3} ${typeText(A)}.
-${t.reason4} ${typeText(B)} ${t.reason5} ${typeText(A)}.`;
-
-  showOut(out, LAST_COPY_TEXT);
+  const out = `${t.headerEnemy}\n${t.sni}: ${en.sni.toLocaleString()}\n${t.inf}: ${en.inf.toLocaleString()}\n${t.cav}: ${en.cav.toLocaleString()}\n\n${t.bestLine} ${LAST_COPY_TEXT}\n\n${t.best}\n1) ${typeText(A)} = ${pct(aShare)}%\n2) ${typeText(B)} = ${pct(bShare)}%\n\n${t.reason1}\n${t.reason2} ${typeText(major)} ${t.reason3} ${typeText(A)}.\n${t.reason4} ${typeText(B)} ${t.reason5} ${typeText(A)}.`;
+  
+  showOut(out, LAST_COPY_TEXT); 
+  showChart(A, B, aShare, bShare);
 }
 
-function showOut(text, copyLine){
-  const outEl = document.getElementById("out");
-  outEl.classList.remove("flash");
-  outEl.innerText = text;
-  requestAnimationFrame(()=> outEl.classList.add("flash"));
-  if(!copyLine) LAST_COPY_TEXT = "";
+function smartAnalyze() {
+  const sni = parseNum(document.getElementById("enSni").value);
+  const inf = parseNum(document.getElementById("enInf").value);
+  const cav = parseNum(document.getElementById("enCav").value);
+  const box = document.getElementById("smartBox"); 
+  if(!box) return;
+  
+  const t = T[LANG] || T.ar; 
+  const total = sni + inf + cav;
+  if(!total) { box.style.display="none"; showOut(t.enterHint, ""); toast(t.enterHint); hideChart(); return; }
+
+  const e =[sni/total, inf/total, cav/total];
+  const counter =[2,0,1]; const losesTo =[2,0,1];      
+  const typeLabel = (i) => { if(i===0) return t.sni; if(i===1) return t.inf; return t.cav; };
+  const typeKey = (i) => { if(i===0) return "sni"; if(i===1) return "inf"; return "cav"; };
+
+  let E1 = 0; 
+  for(let i=1; i<3; i++) if(e[i] > e[E1]) E1 = i;
+  
+  const P = counter[E1]; 
+  const V = losesTo[P]; 
+  const S = counter[V];             
+  const dominance = e[E1]; 
+  const vShare = e[V];
+
+  let primaryPct = 70 + (dominance - 0.50)*30 - vShare*40;
+  primaryPct = Math.max(55, Math.min(85, primaryPct)); 
+  primaryPct = Math.round(primaryPct/5)*5; 
+  primaryPct = Math.max(55, Math.min(85, primaryPct));
+  const secondaryPct = 100 - primaryPct;
+
+  const eSni = Math.round(e[0]*100); 
+  const eInf = Math.round(e[1]*100); 
+  const eCav = Math.round(e[2]*100);
+  
+  const whyLines =[];
+  whyLines.push(`<li>${typeLabel(P)} ${t.smartWhy1} ${typeLabel(E1)}.</li>`);
+  if(vShare > 0.18) { 
+    whyLines.push(`<li>${t.smartWhy2} ${typeLabel(V)} (${Math.round(vShare*100)}%). ${t.smartWhy3} ${typeLabel(S)}.</li>`); 
+  } else { 
+    whyLines.push(`<li>${t.smartWhy4}</li>`); 
+  }
+  whyLines.push(`<li>${t.smartWhy5} <b style="color:var(--btn)">${primaryPct}/${secondaryPct}</b>.</li>`);
+
+  box.innerHTML = `<h3>🧠 ${t.smartTitle}</h3><div class="muted">${t.smartSub}</div><div class="smartGrid"><div class="pill">📊 ${t.smartEnemy}: ${t.sni} ${eSni}% &nbsp;·&nbsp; ${t.inf} ${eInf}% &nbsp;·&nbsp; ${t.cav} ${eCav}%</div><div class="pill">✅ ${t.smartRec}: <b style="margin: 0 5px;">${typeLabel(P)} ${primaryPct}%</b> + <b style="margin: 0 5px;">${typeLabel(S)} ${secondaryPct}%</b></div></div><div class="smartWhyText"><div style="font-weight:800; color:var(--text);">${t.smartWhy}</div><ul>${whyLines.join("")}</ul><div style="margin-top:14px;opacity:.8;font-size:12px;">${t.smartNote}</div></div>`;
+  box.style.display = "block";
+  
+  LAST_COPY_TEXT = `${typeLabel(P)} ${primaryPct}% + ${typeLabel(S)} ${secondaryPct}%`;
+  showOut(`✅ ${t.smartRec}: ${LAST_COPY_TEXT}`, LAST_COPY_TEXT);
+  showChart(typeKey(P), typeKey(S), primaryPct/100, secondaryPct/100);
 }
 
-/* ===== Copy result ===== */
-async function copyResult(){
-  const t = T[LANG];
+function showOut(text, copyLine) { 
+  const outEl = document.getElementById("out"); 
+  outEl.classList.remove("error");
+  outEl.classList.remove("flash"); 
+  outEl.innerText = text; 
+  requestAnimationFrame(()=> outEl.classList.add("flash")); 
+  if(!copyLine) LAST_COPY_TEXT = ""; 
+}
+
+async function copyResult() {
+  const t = T[LANG] || T.ar; 
   const text = LAST_COPY_TEXT || document.getElementById("out").innerText.trim();
-  if(!text) return;
-
-  try{
-    await navigator.clipboard.writeText(text);
-    const btn = document.getElementById("copyBtn");
-    btn.innerText = t.copied;
-    setTimeout(()=> btn.innerText = t.copy, 900);
-  }catch(e){
-    const ta = document.createElement("textarea");
-    ta.value = text;
-    document.body.appendChild(ta);
-    ta.select();
-    document.execCommand("copy");
-    document.body.removeChild(ta);
-    const btn = document.getElementById("copyBtn");
-    btn.innerText = t.copied;
-    setTimeout(()=> btn.innerText = t.copy, 900);
+  if(!text || text === t.outIdle || document.getElementById("out").classList.contains("error")) { 
+    toast(t.toastNeed || t.err); return; 
+  }
+  
+  try { 
+    await navigator.clipboard.writeText(text); 
+    const btn = document.getElementById("copyBtn"); 
+    btn.innerHTML = `✅ ${t.copied.replace('✅ ', '')}`; 
+    setTimeout(()=> btn.innerHTML = t.copy, 1500); 
+    toast(t.copied); 
+  } catch(e) { 
+    const ta = document.createElement("textarea"); 
+    ta.value = text; 
+    document.body.appendChild(ta); 
+    ta.select(); 
+    document.execCommand("copy"); 
+    document.body.removeChild(ta); 
+    const btn = document.getElementById("copyBtn"); 
+    btn.innerHTML = `✅ ${t.copied.replace('✅ ', '')}`; 
+    setTimeout(()=> btn.innerHTML = t.copy, 1500); 
+    toast(t.copied); 
   }
 }
 
-/* ===== init ===== */
-(function init(){
-  const savedLang = localStorage.getItem("F11_LANG");
-  setLang(savedLang || "ar");
+const TYPE_ICON = { sni:"sniper.png", inf:"fighter.png", cav:"cavalry.png" };
+const TYPE_COLOR = { sni:"#1a73e8", inf:"#d97706", cav:"#6d28d9" }; 
+let LAST_REC = null; 
+let donutAnimFrame = null;
 
-  const savedDark = localStorage.getItem("F11_DARK");
-  if(savedDark === "1") document.body.classList.add("dark");
-  refreshDarkButtonText();
-})();
+function hideChart() { 
+  document.getElementById("chartWrap").style.display = "none"; 
+  LAST_REC = null; 
+}
+
+function showChart(A, B, aShare, bShare) {
+  LAST_REC = {A,B,aShare,bShare}; 
+  const t = T[LANG] || T.ar;
+  document.getElementById("ratioText").innerText = `${pct(aShare)} / ${pct(bShare)}`; 
+  document.getElementById("ratioHint").innerText = t.ratioHint; 
+  document.getElementById("nameA").innerText = typeText(A); 
+  document.getElementById("nameB").innerText = typeText(B); 
+  document.getElementById("iconA").src = TYPE_ICON[A]; 
+  document.getElementById("iconB").src = TYPE_ICON[B]; 
+  document.getElementById("pctA").innerText = `${pct(aShare)}%`; 
+  document.getElementById("pctB").innerText = `${pct(bShare)}%`; 
+  document.getElementById("dotA").style.background = TYPE_COLOR[A] || "#4aa3ff"; 
+  document.getElementById("dotB").style.background = TYPE_COLOR[B] || "#d97706"; 
+  document.getElementById("legendTitle").innerText = t.legendTitle;
+  
+  drawRealisticDonut(A, B, aShare); 
+  document.getElementById("chartWrap").style.display = "flex";
+}
+
+function drawRealisticDonut(typeA, typeB, aShare) {
+  const canvas = document.getElementById("chart"); 
+  const ctx = canvas.getContext("2d"); 
+  const W = canvas.width, H = canvas.height; 
+  const cx = W / 2, cy = H / 2; 
+  const r = Math.min(W, H) / 2 - 20; 
+  const thickness = 22;
+  
+  const getGradient = (type) => { 
+    const grad = ctx.createLinearGradient(0, 0, W, H); 
+    if (type === "sni") { grad.addColorStop(0, "#80c6ff"); grad.addColorStop(1, "#1a73e8"); } 
+    else if (type === "inf") { grad.addColorStop(0, "#fbbf24"); grad.addColorStop(1, "#b45309"); } 
+    else if (type === "cav") { grad.addColorStop(0, "#b49afe"); grad.addColorStop(1, "#5b21b6"); } 
+    return grad; 
+  };
+  
+  const gradA = getGradient(typeA); 
+  const gradB = getGradient(typeB);
+  
+  if (donutAnimFrame) cancelAnimationFrame(donutAnimFrame); 
+  let startTime = null; 
+  const duration = 1200; 
+  
+  function animate(timestamp) {
+    if (!startTime) startTime = timestamp; 
+    let progress = (timestamp - startTime) / duration; 
+    if (progress > 1) progress = 1;
+    
+    const ease = progress === 1 ? 1 : 1 - Math.pow(2, -10 * progress); 
+    ctx.clearRect(0, 0, W, H); 
+    const isDark = document.body.classList.contains("dark");
+    
+    ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.strokeStyle = isDark ? "#171a21" : "#e2e8f0"; ctx.lineWidth = thickness; ctx.shadowColor = "transparent"; ctx.stroke();
+    ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.strokeStyle = isDark ? "rgba(0,0,0,0.5)" : "rgba(0,0,0,0.05)"; ctx.lineWidth = thickness; ctx.stroke();
+    
+    const startAngle = -Math.PI / 2; 
+    const currentAShare = aShare * ease; 
+    const aEnd = startAngle + (Math.PI * 2 * currentAShare); 
+    ctx.lineCap = "round";
+    
+    if (aShare < 1) { 
+      const currentBShare = (1 - aShare) * ease; 
+      const bEnd = aEnd + (Math.PI * 2 * currentBShare); 
+      ctx.beginPath(); ctx.arc(cx, cy, r, aEnd, bEnd); ctx.strokeStyle = gradB; ctx.lineWidth = thickness; ctx.shadowColor = isDark ? "rgba(0,0,0,0.6)" : "rgba(0,0,0,0.25)"; ctx.shadowBlur = 10; ctx.shadowOffsetX = 2; ctx.shadowOffsetY = 6; ctx.stroke(); 
+    }
+    
+    ctx.beginPath(); ctx.arc(cx, cy, r, startAngle, aEnd); ctx.strokeStyle = gradA; ctx.lineWidth = thickness; ctx.shadowColor = isDark ? "rgba(0,0,0,0.8)" : "rgba(0,0,0,0.35)"; ctx.shadowBlur = 15; ctx.shadowOffsetX = 4; ctx.shadowOffsetY = 8; ctx.stroke();
+    
+    if (progress < 1) donutAnimFrame = requestAnimationFrame(animate);
+  }
+  donutAnimFrame = requestAnimationFrame(animate);
+}
+
+function toast(msg) { 
+  const el = document.getElementById("toast"); 
+  el.innerText = msg; 
+  el.classList.add("show"); 
+  clearTimeout(toast._t); 
+  toast._t = setTimeout(()=> el.classList.remove("show"), 2000); 
+}
+
+async function shareResult() { 
+  const t = T[LANG] || T.ar; 
+  if(!LAST_COPY_TEXT) { toast(t.toastNeed || t.err); return; } 
+  const url = location.href; 
+  const text = `${t.bestLine} ${LAST_COPY_TEXT}\n${url}`; 
+  if(navigator.share) { 
+    try{ await navigator.share({ title: document.title, text, url }); toast(t.shared); return; } catch(e){} 
+  } 
+  try{ await navigator.clipboard.writeText(text); toast(t.shared); } catch(e){ toast(t.copied); } 
+}
+
+function resetAll() { 
+  document.getElementById("enSni").value = ""; 
+  document.getElementById("enInf").value = ""; 
+  document.getElementById("enCav").value = ""; 
+  LAST_COPY_TEXT = ""; 
+  hideChart(); 
+  document.getElementById("smartBox").style.display = "none"; 
+  const outEl = document.getElementById("out");
+  outEl.classList.remove("error");
+  outEl.innerText = (T[LANG] || T.ar).outIdle; 
+  toast((T[LANG] || T.ar).toastReset || "Reset"); 
+}
+
+/* ================== تشغيل الموقع ================== */
+document.addEventListener("DOMContentLoaded", function() {
+  try {
+    const savedLang = safeGetStorage("F11_LANG"); 
+    let autoLang = "ar"; 
+    try { 
+      const nl = (navigator.language||"").toLowerCase(); 
+      if(nl.startsWith("pt")) autoLang = "pt"; 
+      else if(nl.startsWith("en")) autoLang = "en"; 
+      else if(nl.startsWith("ar")) autoLang = "ar"; 
+    } catch(e) {} 
+    
+    setLang(savedLang || autoLang); 
+    
+    const savedDark = safeGetStorage("F11_DARK"); 
+    if(savedDark === "1") document.body.classList.add("dark"); 
+    refreshDarkButtonText(); 
+    hideChart(); 
+  } catch(error) {}
+});
+</script>
+
+<div class="toast" id="toast">✅</div>
+
+<script>
+  // تسجيل Service Worker لتحويل الموقع لتطبيق
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('sw.js')
+        .then(reg => console.log('تم تفعيل التطبيق بنجاح!', reg))
+        .catch(err => console.log('فشل تفعيل التطبيق', err));
+    });
+  }
 </script>
 
 </body>
