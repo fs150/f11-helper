@@ -451,6 +451,157 @@ async function handleImageUpload(event) {
     try {
         if (typeof Tesseract === 'undefined') throw new Error("مكتبة القراءة لم تُحمَّل بعد، انتظر ثم حاول مجدداً.");
 
+        // ── تحميل الصورة ─────────────────────────────────────────
+        const img = new Image();
+        img.src = URL.createObjectURL(file);
+        await new Promise((res, rej) => { img.onload = res; img.onerror = () => rej("فشل تحميل الصورة"); });
+        const W = img.width, H = img.height;
+
+        // ── رسم الصورة كاملة ─────────────────────────────────────
+        const full = document.createElement("canvas");
+        full.width = W; full.height = H;
+        const fctx = full.getContext("2d");
+        fctx.drawImage(img, 0, 0);
+        const pixels = fctx.getImageData(0, 0, W, H).data;
+
+        // ── البحث عن نقطة الانتقال بني → فاتح ───────────────────
+        function rowAvg(y) {
+            let r=0,g=0,b=0,n=0;
+            const x0=Math.floor(W*0.1), x1=Math.floor(W*0.9);
+            for(let x=x0;x<x1;x++){const i=(y*W+x)*4;r+=pixels[i];g+=pixels[i+1];b+=pixels[i+2];n++;}
+            return {r:r/n,g:g/n,b:b/n};
+        }
+
+        let transY = Math.floor(H*0.40); // fallback
+        for(let y=Math.floor(H*0.20); y<Math.floor(H*0.75); y++){
+            const prev = rowAvg(Math.max(0,y-2));
+            const curr = rowAvg(y);
+            const prevBrown = prev.r>150 && prev.r<200 && (prev.r-prev.b)>45 && (prev.r-prev.b)<75;
+            const currLight  = curr.r>200 && curr.g>185 && curr.b>165;
+            if(prevBrown && currLight){ transY=y; break; }
+        }
+
+        console.log("🎯 انتقال عند:", transY, "/", H);
+
+        // ── قطع المنطقة وتكبيرها ─────────────────────────────────
+        const SCALE = 3;
+        const searchH = Math.floor(H * 0.25);
+        const crop = document.createElement("canvas");
+        crop.width = W*SCALE; crop.height = searchH*SCALE;
+        const cctx = crop.getContext("2d");
+        cctx.drawImage(img, 0, transY, W, searchH, 0, 0, crop.width, crop.height);
+
+        // ── دالة قراءة بعتبة معينة ───────────────────────────────
+        async function readWithThresh(thresh) {
+            const id = cctx.getImageData(0, 0, crop.width, crop.height);
+            const px = id.data;
+            for(let i=0;i<px.length;i+=4){
+                const g = px[i]*0.299+px[i+1]*0.587+px[i+2]*0.114;
+                const v = g<thresh ? 0 : 255;
+                px[i]=px[i+1]=px[i+2]=v;
+            }
+            // نرسم النسخة المعالجة على canvas مؤقت
+            const tmp = document.createElement("canvas");
+            tmp.width=crop.width+40; tmp.height=crop.height+40;
+            const tctx = tmp.getContext("2d");
+            tctx.fillStyle="#fff"; tctx.fillRect(0,0,tmp.width,tmp.height);
+            const tmpId = tctx.getImageData(0,0,tmp.width,tmp.height);
+            for(let y=0;y<crop.height;y++)
+                for(let x=0;x<crop.width;x++){
+                    const si=(y*crop.width+x)*4, di=((y+20)*tmp.width+(x+20))*4;
+                    tmpId.data[di]=tmpId.data[di+1]=tmpId.data[di+2]=px[si];
+                    tmpId.data[di+3]=255;
+                }
+            tctx.putImageData(tmpId,0,0);
+
+            const worker = await Tesseract.createWorker('eng');
+            await worker.setParameters({
+                tessedit_char_whitelist: '0123456789.kmKM ',
+                tessedit_pageseg_mode: '6'
+            });
+            const result = await worker.recognize(tmp.toDataURL('image/png'));
+            await worker.terminate();
+
+            const nums = [];
+            for(const word of result.data.words){
+                let t = word.text.toLowerCase().replace(/,/g,'.').replace(/\s/g,'');
+                t = t.replace(/[^0-9\.km]/g,'').replace(/\.$/,'');
+                const conf = word.confidence;
+                if(conf > 50 && /^\d+\.?\d*[km]$/.test(t)){
+                    nums.push({text:t, x:word.bbox.x0/SCALE, conf});
+                }
+            }
+            return nums;
+        }
+
+        // ── نجرب عتبات متعددة ────────────────────────────────────
+        let bestNums = [];
+        for(const thresh of [120, 140, 100, 160]){
+            const nums = await readWithThresh(thresh);
+            console.log(`🔢 عتبة ${thresh}:`, nums.map(n=>`${n.text}@${Math.round(n.x/W*100)}%`));
+            if(nums.length > bestNums.length) bestNums = nums;
+            if(bestNums.length >= 3) break;
+        }
+
+        console.log("✅ أفضل نتيجة:", bestNums);
+
+        // ── تعيين الأرقام للخانات حسب الموضع ────────────────────
+        const centers = {inf: W*0.25, sni: W*0.50, cav: W*0.75};
+        const result  = {inf:"0", sni:"0", cav:"0"};
+        const assigned = new Set();
+
+        const sorted = [...bestNums].sort((a,b)=>a.x-b.x);
+
+        if(sorted.length >= 3){
+            result.inf = sorted[0].text;
+            result.sni = sorted[1].text;
+            result.cav = sorted[2].text;
+        } else {
+            for(const n of sorted){
+                let best = null, bestDist = Infinity;
+                for(const [k,cx] of Object.entries(centers)){
+                    if(assigned.has(k)) continue;
+                    const d = Math.abs(n.x - cx);
+                    if(d < bestDist){ bestDist=d; best=k; }
+                }
+                if(best){ result[best]=n.text; assigned.add(best); }
+            }
+        }
+
+        if(result.inf==="0" && result.sni==="0" && result.cav==="0"){
+            throw new Error("لم يتم العثور على أرقام القوات. تأكد أن الصورة تقرير استطلاع واضح.");
+        }
+
+        document.getElementById("enInf").value = result.inf;
+        document.getElementById("enSni").value = result.sni;
+        document.getElementById("enCav").value = result.cav;
+
+        toast(`✅ ${result.inf} · ${result.sni} · ${result.cav}`);
+        setTimeout(() => smartAnalyze(), 400);
+
+    } catch(err) {
+        console.error("❌ خطأ:", err);
+        showSiteError(err.message || "حدث خطأ أثناء قراءة الصورة.");
+    } finally {
+        overlay.style.display = "none";
+        document.querySelectorAll('.upload-btn input[type="file"]').forEach(i => i.value = "");
+    }
+}
+    const file = event.target.files[0];
+    if (!file) return;
+
+    showUploadPreview(file);
+    document.getElementById("out").classList.remove("error");
+
+    const overlay = document.getElementById("loadingOverlay");
+    const loadingTxt = document.getElementById("loadingText");
+    overlay.style.display = "flex";
+    if (loadingTxt) loadingTxt.innerText = "🔍 جاري قراءة التقرير...";
+    await new Promise(r => setTimeout(r, 40));
+
+    try {
+        if (typeof Tesseract === 'undefined') throw new Error("مكتبة القراءة لم تُحمَّل بعد، انتظر ثم حاول مجدداً.");
+
         // ── تحميل الصورة ──────────────────────────────────────────
         const img = new Image();
         img.src = URL.createObjectURL(file);
