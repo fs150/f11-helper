@@ -80,7 +80,6 @@
   @keyframes floatCamp { 0% { transform: translateY(0px); } 50% { transform: translateY(-12px); } 100% { transform: translateY(0px); } }
   @keyframes pulseGlow { from { transform: scale(0.85); opacity: 0.6; } to { transform: scale(1.2); opacity: 1; } }
 
-  /* تنسيق شعار Daly Alpha الاحترافي الجديد الفخم */
   h2#title {
     display: flex;
     align-items: center;
@@ -224,7 +223,7 @@
   <img src="camp.png" alt="Daly Camp" class="hero-image" onerror="this.style.display='none'">
 </div>
 
-<!-- الشعار الاحترافي الجديد -->
+<!-- الشعار الاحترافي -->
 <h2 id="title">
   <span class="daly-text">Daly</span><span class="alpha-badge">ALPHA</span>
 </h2>
@@ -337,13 +336,12 @@ function showSiteError(msg) {
     document.getElementById("smartBox").style.display = "none";
 }
 
-/* ================== الذكاء الاصطناعي للصورة ================== */
+/* ================== الذكاء الاصطناعي للصورة (سريع ومانع للتجميد) ================== */
 async function handleImageUpload(event) {
     const file = event.target.files[0];
     if (!file) return;
 
     const t = T[LANG] || T.ar;
-    
     document.getElementById("out").classList.remove("error");
 
     if (typeof Tesseract === 'undefined') {
@@ -355,35 +353,42 @@ async function handleImageUpload(event) {
     const overlay = document.getElementById("loadingOverlay");
     overlay.style.display = "flex";
 
+    // إعطاء المتصفح فرصة 50 جزء من الثانية ليرسم شاشة التحميل قبل أن نبدأ بحرق المعالج!
+    await new Promise(resolve => setTimeout(resolve, 50));
+
     try {
         const img = new Image();
         img.src = URL.createObjectURL(file);
-        
         await new Promise((resolve, reject) => {
             img.onload = resolve;
             img.onerror = () => reject("فشل تحميل الصورة.");
         });
 
-        const canvas = document.createElement('canvas');
-        const ctx = canvas.getContext('2d');
+        // ===== نقطع الصورة من 35% إلى 75% - المنطقة التي تظهر فيها أرقام الإجمالي دائماً =====
+        const startY   = img.height * 0.35;
+        const sliceH   = img.height * 0.40;
 
-        const startY = img.height * 0.20; 
-        const sliceHeight = img.height * 0.60; 
-        
-        const scale = 3; 
-        canvas.width = img.width * scale;
-        canvas.height = sliceHeight * scale;
+        let scale = 1;
+        if (img.width < 600)       scale = 2.5;
+        else if (img.width > 1200) scale = 1200 / img.width;
+
+        const canvas = document.createElement('canvas');
+        const ctx    = canvas.getContext('2d');
+        canvas.width  = img.width  * scale;
+        canvas.height = sliceH     * scale;
 
         ctx.imageSmoothingEnabled = true;
         ctx.imageSmoothingQuality = 'high';
-        ctx.drawImage(img, 0, startY, img.width, sliceHeight, 0, 0, canvas.width, canvas.height);
+        ctx.drawImage(img, 0, startY, img.width, sliceH, 0, 0, canvas.width, canvas.height);
 
+        // ===== تحسين التباين لتوضيح الأرقام =====
         const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-        const data = imageData.data;
-        for (let i = 0; i < data.length; i += 4) {
-            let gray = data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114;
-            gray = (gray - 128) * 1.5 + 128; 
-            data[i] = data[i + 1] = data[i + 2] = Math.min(255, Math.max(0, gray));
+        const d = imageData.data;
+        for (let i = 0; i < d.length; i += 4) {
+            let g = d[i] * 0.299 + d[i+1] * 0.587 + d[i+2] * 0.114;
+            g = (g - 128) * 2.2 + 128;
+            if (g > 255) g = 255; else if (g < 0) g = 0;
+            d[i] = d[i+1] = d[i+2] = g;
         }
         ctx.putImageData(imageData, 0, 0);
 
@@ -391,69 +396,111 @@ async function handleImageUpload(event) {
 
         const worker = await Tesseract.createWorker('eng');
         await worker.setParameters({ tessedit_char_whitelist: '0123456789.,kmKM ' });
-        
         const ret = await worker.recognize(processedImage);
         await worker.terminate();
 
-        const words = ret.data.words;
-        let validNumbers =[];
-        
-        const numRegex = /(\d+[\.,]?\d*[km])/i;
+        // ===== تنظيف وفلترة الكلمات المقروءة =====
+        // نقبل فقط أرقام بصيغة: 0 أو 1.1m أو 360.0k أو أي رقم+k أو رقم+m
+        const numRegex = /^\d+\.?\d*[km]$|^0$/i;
+        let validNumbers = [];
 
-        for (let word of words) {
-            let text = word.text.toLowerCase().replace(/,/g, '.').replace(/[oO]/g, '0').replace(/[lL|]/g, '1');
-            let match = text.match(numRegex);
-            
-            if (match) {
-                validNumbers.push({
-                    text: match[1], 
-                    x: word.bbox.x0,
-                    y: word.bbox.y0
-                });
+        for (let word of ret.data.words) {
+            let text = word.text.toLowerCase()
+                .replace(/,/g, '.').replace(/[oO]/g, '0')
+                .replace(/[lL|iI]/g, '1').replace(/[sS]/g, '5');
+            let clean = text.replace(/[^0-9\.km]/g, '').replace(/\.$/, '');
+
+            // ✅ نقبل فقط أرقام القوات (رقم + k أو m) أو صفر
+            if (clean && numRegex.test(clean)) {
+                validNumbers.push({ text: clean, x: word.bbox.x0, y: word.bbox.y0 });
             }
         }
 
-        validNumbers.sort((a, b) => a.y - b.y);
+        console.log("✅ أرقام القوات المكتشفة:", validNumbers.map(n => n.text));
 
-        let rows =[];
+        // ===== تجميع الأرقام في صفوف أفقية =====
+        validNumbers.sort((a, b) => a.y - b.y);
+        let rows = [];
         if (validNumbers.length > 0) {
-            let currentRow = [validNumbers[0]];
+            let cur = [validNumbers[0]];
+            const thresh = Math.max(30, canvas.height * 0.06);
             for (let i = 1; i < validNumbers.length; i++) {
-                if (Math.abs(validNumbers[i].y - currentRow[0].y) < 80) {
-                    currentRow.push(validNumbers[i]);
+                if (Math.abs(validNumbers[i].y - cur[0].y) < thresh) {
+                    cur.push(validNumbers[i]);
                 } else {
-                    rows.push(currentRow);
-                    currentRow = [validNumbers[i]];
+                    rows.push(cur);
+                    cur = [validNumbers[i]];
                 }
             }
-            rows.push(currentRow);
+            rows.push(cur);
         }
 
-        let targetRow = rows.find(r => r.length >= 3);
+        console.log("📊 الصفوف:", rows.map(r => r.map(n=>n.text)));
+
+        // ===== البحث عن سطر الإجمالي =====
+        // القاعدة الذهبية: سطر الإجمالي هو أول سطر فيه 3 أرقام كلها k أو m
+        // أو أول سطر فيه على الأقل رقمان k/m في 2-3 عناصر
+        let targetRow = null;
+
+        // أولاً: نبحث عن سطر بـ 3 أرقام k/m (المثالي)
+        targetRow = rows.find(r => r.length === 3 && r.every(n => /[km]/i.test(n.text)));
+
+        // ثانياً: إذا لم نجد، نبحث عن سطر بـ 3 عناصر فيه رقمان k/m على الأقل
+        if (!targetRow) {
+            targetRow = rows.find(r => r.length === 3 && r.filter(n => /[km]/i.test(n.text)).length >= 2);
+        }
+
+        // ثالثاً: سطر بـ 2 أرقام k/m (حالة الصفر الغير مقروء)
+        if (!targetRow) {
+            targetRow = rows.find(r => r.length === 2 && r.filter(n => /[km]/i.test(n.text)).length === 2);
+        }
+
+        // رابعاً: أي سطر فيه k أو m كحل أخير
+        if (!targetRow) {
+            targetRow = rows.find(r => r.some(n => /[km]/i.test(n.text)));
+        }
 
         if (targetRow) {
             targetRow.sort((a, b) => a.x - b.x);
-            
-            document.getElementById("enInf").value = targetRow[0].text; 
-            document.getElementById("enSni").value = targetRow[1].text; 
-            document.getElementById("enCav").value = targetRow[2].text; 
-            
+            let inf = "0", sni = "0", cav = "0";
+            const w = canvas.width;
+
+            if (targetRow.length >= 3) {
+                // الترتيب من اليسار: مقاتل | قناص | جوال (RTL في اللعبة)
+                inf = targetRow[0].text;
+                sni = targetRow[1].text;
+                cav = targetRow[2].text;
+            } else if (targetRow.length === 2) {
+                const n1 = targetRow[0], n2 = targetRow[1];
+                if (n1.x < w * 0.33 && n2.x > w * 0.63) {
+                    inf = n1.text; sni = "0"; cav = n2.text;
+                } else if (n1.x > w * 0.33) {
+                    inf = "0"; sni = n1.text; cav = n2.text;
+                } else {
+                    inf = n1.text; sni = n2.text; cav = "0";
+                }
+            }
+
+            document.getElementById("enInf").value = inf;
+            document.getElementById("enSni").value = sni;
+            document.getElementById("enCav").value = cav;
+
             toast("✅ تمت قراءة الأرقام بنجاح!");
-            setTimeout(() => smartAnalyze(), 500); 
+            setTimeout(() => smartAnalyze(), 500);
         } else {
-            console.log("النتائج:", validNumbers);
+            console.log("❌ لم يُكتشف أي رقم قوات:", validNumbers);
             showSiteError(t.ocrFail || "لم يتمكن الذكاء من قراءة الأرقام. الرجاء التأكد أن الصورة لتقرير الاستطلاع.");
         }
-    } catch (error) {
-        console.error(error);
-        showSiteError("حدث خطأ تقني أثناء تحليل الصورة. يرجى المحاولة مرة أخرى.");
+    } catch(err) {
+        console.error("خطأ:", err);
+        showSiteError("حدث خطأ أثناء معالجة الصورة. حاول مرة أخرى.");
     } finally {
-        overlay.style.display = "none";
-        document.getElementById("imageInput").value = ""; 
+        document.getElementById("loadingOverlay").style.display = "none";
+        document.getElementById("imageInput").value = "";
     }
 }
 
-/* ================== الترجمات (تم توحيد الشعار لجميع اللغات) ================== */
+/* ================== الترجمات ================== */
 const T = {
   ar: {
     title: "<span class='daly-text'>Daly</span><span class='alpha-badge'>ALPHA</span>",
