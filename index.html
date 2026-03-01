@@ -17,7 +17,8 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800;900&display=swap" rel="stylesheet">
 
-<!-- Claude API تستخدم مباشرة من المتصفح -->
+<!-- Tesseract.js: OCR بدون API key -->
+<script src="https://unpkg.com/tesseract.js@5/dist/tesseract.min.js"></script>
 
 <style>
   :root {
@@ -243,6 +244,7 @@
   .smartWhyText { margin-top: 10px; font-size: 14px; font-weight: 500; }
   .smartWhyText ul { margin: 8px 0; padding-inline-start: 24px; }
   .smartWhyText li { margin-bottom: 6px; }
+
 </style>
 </head>
 
@@ -432,121 +434,117 @@ function clearUpload() {
     document.querySelectorAll('.upload-btn input[type="file"]').forEach(i => i.value = "");
 }
 
-/* ================== قراءة الصورة بـ Claude API (عبر Worker) ================== */
+/* ================== قراءة الصورة بـ Tesseract OCR (بدون API key) ================== */
 
-// ← ضع رابط الـ Worker بعد رفعه على Cloudflare
-const WORKER_URL = "https://daly-claude.xcxc054.workers.dev";
+// استخراج أرقام القوات من نص OCR
+function extractTroopsFromOCR(rawText) {
+    // تنظيف النص وتصحيح أخطاء OCR الشائعة
+    let text = rawText
+        .replace(/[Oo]/g, '0')   // حرف O يُقرأ كـ 0
+        .replace(/[Il|]/g, '1')  // حرف I/l يُقرأ كـ 1
+        .replace(/[Ss]/g, (m, i, str) => {
+            // S بعد رقم = 5 (مثل: 94S.0k → 945.0k)
+            return (i > 0 && /\d/.test(str[i-1])) ? '5' : m;
+        })
+        .toLowerCase();
+
+    const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+
+    // نمط الأرقام: 945.0k أو 1.1m أو 640k أو أعداد كبيرة مجردة
+    const numPat = /(\d+\.?\d*)\s*([km])\b/g;
+
+    // البحث عن سطر يحتوي "total forces" أو "إجمالي القوات"
+    const totalIdx = lines.findIndex(l =>
+        /total[\s.]*force/i.test(l) ||
+        /total[\s.]*troop/i.test(l) ||
+        /all[\s.]*force/i.test(l) ||
+        /إجمالي/.test(l)
+    );
+
+    // جمع المرشحين من المنطقة القريبة من "Total Forces"
+    let candidates = [];
+    const start = totalIdx >= 0 ? totalIdx : 0;
+    const end   = Math.min(start + 12, lines.length);
+
+    for (let i = start; i < end; i++) {
+        const matches = [...lines[i].matchAll(numPat)];
+        if (matches.length === 3) {
+            // وجدنا سطراً بثلاثة أرقام بالضبط — هذا هو الصف المطلوب
+            candidates = matches.map(m => m[1] + m[2]);
+            break;
+        }
+        if (matches.length > 0 && candidates.length < 3) {
+            matches.forEach(m => candidates.push(m[1] + m[2]));
+        }
+        if (candidates.length >= 3) break;
+    }
+
+    // احتياطي: ابحث في كل النص إذا لم نجد 3 أرقام
+    if (candidates.length < 3) {
+        candidates = [];
+        const allMatches = [...text.matchAll(numPat)];
+        // تجاهل الأرقام المكررة (أرقام تفصيلية للمستويات)
+        const seen = new Set();
+        for (const m of allMatches) {
+            const val = m[1] + m[2];
+            if (!seen.has(val)) { seen.add(val); candidates.push(val); }
+            if (candidates.length >= 3) break;
+        }
+    }
+
+    return {
+        fighter: candidates[0] || "0",
+        sniper:  candidates[1] || "0",
+        cavalry: candidates[2] || "0"
+    };
+}
 
 async function handleImageUpload(event) {
     const file = event.target.files[0];
     if (!file) return;
 
     showUploadPreview(file);
-
-    const t = T[LANG] || T.ar;
     document.getElementById("out").classList.remove("error");
 
     const overlay = document.getElementById("loadingOverlay");
     const loadingText = document.getElementById("loadingText");
     overlay.style.display = "flex";
-    if (loadingText) loadingText.innerText = "🤖 Claude يقرأ التقرير...";
+    if (loadingText) loadingText.innerText = "🔍 جاري قراءة الأرقام...";
 
     try {
-        // ===== تحويل الصورة إلى base64 =====
-        const base64 = await new Promise((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onload = () => resolve(reader.result.split(",")[1]);
-            reader.onerror = () => reject("فشل قراءة الملف");
-            reader.readAsDataURL(file);
-        });
-
-        const mediaType = file.type || "image/jpeg";
-
-        // ===== إرسال الصورة للـ Worker (الـ Key مخفي في السيرفر) =====
-        const response = await fetch(WORKER_URL, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-                model: "claude-sonnet-4-20250514",
-                max_tokens: 200,
-                messages: [{
-                    role: "user",
-                    content: [
-                        {
-                            type: "image",
-                            source: { type: "base64", media_type: mediaType, data: base64 }
-                        },
-                        {
-                            type: "text",
-                            text: `أنت نظام استخراج بيانات دقيق من تقارير استطلاع لعبة West Game.
-
-ابحث في الصورة عن قسم "إجمالي القوات" أو "Total Forces".
-في هذا القسم يوجد صف من 3 أرقام كبيرة مع أيقونات صغيرة فوق كل رقم.
-
-ترتيب الأيقونات من اليسار إلى اليمين في الصورة:
-1. الأيقونة اليسرى (أيقونة سيف أو درع أو محارب) = المقاتل fighter
-2. الأيقونة الوسطى (أيقونة بندقية أو رشاش) = القناص sniper
-3. الأيقونة اليمنى (أيقونة حصان) = الجوال cavalry
-
-قواعد مهمة جداً:
-- اقرأ فقط الصف الأول من الأرقام مباشرة تحت عنوان "إجمالي القوات"
-- تجاهل تماماً الأرقام في صفوف الوحدات التفصيلية (مثل مستوى VIII أو IX أو X)
-- الأرقام تظهر بصيغ مثل: 945.0k أو 1.1m أو 640.0k أو 0
-- حوّل أي حرف K أو M كبير إلى صغير (k أو m)
-- إذا كانت القيمة صفراً اكتب بالضبط: 0
-
-أجب فقط بهذا JSON بدون أي نص إضافي أو backticks:
-{"fighter":"???","sniper":"???","cavalry":"???"}`
-                        }
-                    ]
-                }]
-            })
-        });
-
-        if (!response.ok) {
-            const errData = await response.json().catch(() => ({}));
-            throw new Error(errData?.error?.message || `HTTP ${response.status}`);
+        // تأكد أن Tesseract محمّل
+        if (typeof Tesseract === "undefined") {
+            throw new Error("مكتبة OCR لم تُحمَّل. تحقق من اتصال الإنترنت وأعد تحميل الصفحة.");
         }
 
-        const data = await response.json();
-        const rawText = data.content?.map(b => b.text || "").join("").trim();
+        // تشغيل OCR
+        const result = await Tesseract.recognize(file, 'eng', {
+            logger: m => {
+                if (m.status === 'recognizing text' && loadingText) {
+                    const pct = Math.round((m.progress || 0) * 100);
+                    loadingText.innerText = `🔍 ${pct}%`;
+                }
+            }
+        });
 
-        console.log("🤖 Claude رد بـ:", rawText);
+        const rawText = result.data.text || "";
+        console.log("🔍 OCR نص كامل:\n", rawText);
 
-        // ===== تحليل الرد =====
-        let parsed;
-        try {
-            const clean = rawText.replace(/```json|```/gi, "").trim();
-            parsed = JSON.parse(clean);
-        } catch(e) {
-            // محاولة استخراج بالـ regex إذا فشل JSON
-            const extract = (label) => {
-                const m = rawText.match(new RegExp(`"${label}"\\s*:\\s*"([^"]+)"`));
-                return m ? m[1] : "0";
-            };
-            parsed = {
-                fighter:  extract("fighter"),
-                sniper:   extract("sniper"),
-                cavalry:  extract("cavalry")
-            };
-        }
+        const parsed = extractTroopsFromOCR(rawText);
 
-        // ===== تطبيع القيم (إزالة مسافات، تحويل K/M لصغير، إزالة فواصل) =====
-        const normalizeVal = v => (v || "0").toString().toLowerCase().trim().replace(/,/g, "").replace(/\s/g, "");
+        // تطبيع وتحقق
+        const norm = v => (v || "0").toString().toLowerCase().trim().replace(/,/g, "").replace(/\s/g, "");
+        const isValid = v => /^\d+\.?\d*[km]$|^\d{4,}$|^0$/.test(v);
 
-        const inf = normalizeVal(parsed.fighter);
-        const sni = normalizeVal(parsed.sniper);
-        const cav = normalizeVal(parsed.cavalry);
-
-        // ===== التحقق من صحة النتيجة =====
-        const isValid = v => /^\d+\.?\d*[km]$|^0$/.test(v);
+        const inf = norm(parsed.fighter);
+        const sni = norm(parsed.sniper);
+        const cav = norm(parsed.cavalry);
 
         const validCount = [inf, sni, cav].filter(isValid).length;
         if (validCount === 0) {
-            throw new Error("لم يتمكن Claude من التعرف على أرقام القوات في هذه الصورة.");
+            throw new Error("لم يتمكن OCR من قراءة أرقام القوات. جرب صورة أوضح.");
         }
 
-        // تصحيح أي قيمة غير صالحة إلى "0" بدلاً من تمريرها خاطئة
         const safeInf = isValid(inf) ? inf : "0";
         const safeSni = isValid(sni) ? sni : "0";
         const safeCav = isValid(cav) ? cav : "0";
@@ -555,17 +553,12 @@ async function handleImageUpload(event) {
         document.getElementById("enSni").value = safeSni;
         document.getElementById("enCav").value = safeCav;
 
-        // ===== إضافة توست مخصص يعرض الأرقام =====
         toast(`✅ ${safeInf} · ${safeSni} · ${safeCav}`);
         setTimeout(() => smartAnalyze(), 400);
 
     } catch(err) {
-        console.error("❌ خطأ في Claude API:", err);
-        const msg = err.message?.includes("401") ? "مفتاح API غير صالح." :
-                    err.message?.includes("429") ? "تجاوزت حد الطلبات، انتظر قليلاً." :
-                    err.message?.includes("fetch") ? "تعذر الوصول للإنترنت." :
-                    (err.message || "حدث خطأ غير متوقع.");
-        showSiteError(msg);
+        console.error("❌ خطأ OCR:", err);
+        showSiteError(err.message || "حدث خطأ في قراءة الصورة.");
     } finally {
         overlay.style.display = "none";
         document.querySelectorAll('.upload-btn input[type="file"]').forEach(i => i.value = "");
@@ -1077,11 +1070,11 @@ document.addEventListener("DOMContentLoaded", function() {
       else if(nl.startsWith("ar")) autoLang = "ar"; 
     } catch(e) {} 
     
-    setLang(savedLang || autoLang); 
-    
-    const savedDark = safeGetStorage("F11_DARK"); 
-    if(savedDark === "1") document.body.classList.add("dark"); 
-    refreshDarkButtonText(); 
+    setLang(savedLang || autoLang);
+
+    const savedDark = safeGetStorage("F11_DARK");
+    if(savedDark === "1") document.body.classList.add("dark");
+    refreshDarkButtonText();
     hideChart();
   } catch(error) {}
 });
