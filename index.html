@@ -17,8 +17,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800;900&display=swap" rel="stylesheet">
 
-<!-- مكتبة Tesseract لقراءة الصور -->
-<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js" async defer></script>
+<!-- Claude API تستخدم مباشرة من المتصفح -->
 
 <style>
   :root {
@@ -433,348 +432,140 @@ function clearUpload() {
     document.querySelectorAll('.upload-btn input[type="file"]').forEach(i => i.value = "");
 }
 
-/* ================== قراءة الصورة بـ Tesseract ================== */
+/* ================== قراءة الصورة بـ Claude API (عبر Worker) ================== */
+
+// ← ضع رابط الـ Worker بعد رفعه على Cloudflare
+const WORKER_URL = "https://daly-claude.xcxc054.workers.dev";
 
 async function handleImageUpload(event) {
     const file = event.target.files[0];
     if (!file) return;
 
     showUploadPreview(file);
+
+    const t = T[LANG] || T.ar;
     document.getElementById("out").classList.remove("error");
 
     const overlay = document.getElementById("loadingOverlay");
-    const loadingTxt = document.getElementById("loadingText");
+    const loadingText = document.getElementById("loadingText");
     overlay.style.display = "flex";
-    if (loadingTxt) loadingTxt.innerText = "🔍 جاري قراءة التقرير...";
-    await new Promise(r => setTimeout(r, 40));
+    if (loadingText) loadingText.innerText = "🤖 Claude يقرأ التقرير...";
 
     try {
-        if (typeof Tesseract === 'undefined') throw new Error("مكتبة القراءة لم تُحمَّل بعد، انتظر ثم حاول مجدداً.");
-
-        // ── تحميل الصورة ─────────────────────────────────────────
-        const img = new Image();
-        img.src = URL.createObjectURL(file);
-        await new Promise((res, rej) => { img.onload = res; img.onerror = () => rej("فشل تحميل الصورة"); });
-        const W = img.width, H = img.height;
-
-        // ── رسم الصورة كاملة ─────────────────────────────────────
-        const full = document.createElement("canvas");
-        full.width = W; full.height = H;
-        const fctx = full.getContext("2d");
-        fctx.drawImage(img, 0, 0);
-        const pixels = fctx.getImageData(0, 0, W, H).data;
-
-        // ── البحث عن نقطة الانتقال بني → فاتح ───────────────────
-        function rowAvg(y) {
-            let r=0,g=0,b=0,n=0;
-            const x0=Math.floor(W*0.1), x1=Math.floor(W*0.9);
-            for(let x=x0;x<x1;x++){const i=(y*W+x)*4;r+=pixels[i];g+=pixels[i+1];b+=pixels[i+2];n++;}
-            return {r:r/n,g:g/n,b:b/n};
-        }
-
-        let transY = Math.floor(H*0.40); // fallback
-        for(let y=Math.floor(H*0.20); y<Math.floor(H*0.75); y++){
-            const prev = rowAvg(Math.max(0,y-2));
-            const curr = rowAvg(y);
-            const prevBrown = prev.r>150 && prev.r<200 && (prev.r-prev.b)>45 && (prev.r-prev.b)<75;
-            const currLight  = curr.r>200 && curr.g>185 && curr.b>165;
-            if(prevBrown && currLight){ transY=y; break; }
-        }
-
-        console.log("🎯 انتقال عند:", transY, "/", H);
-
-        // ── قطع المنطقة وتكبيرها ─────────────────────────────────
-        const SCALE = 3;
-        const searchH = Math.floor(H * 0.25);
-        const crop = document.createElement("canvas");
-        crop.width = W*SCALE; crop.height = searchH*SCALE;
-        const cctx = crop.getContext("2d");
-        cctx.drawImage(img, 0, transY, W, searchH, 0, 0, crop.width, crop.height);
-
-        // ── دالة قراءة بعتبة معينة ───────────────────────────────
-        async function readWithThresh(thresh) {
-            const id = cctx.getImageData(0, 0, crop.width, crop.height);
-            const px = id.data;
-            for(let i=0;i<px.length;i+=4){
-                const g = px[i]*0.299+px[i+1]*0.587+px[i+2]*0.114;
-                const v = g<thresh ? 0 : 255;
-                px[i]=px[i+1]=px[i+2]=v;
-            }
-            // نرسم النسخة المعالجة على canvas مؤقت
-            const tmp = document.createElement("canvas");
-            tmp.width=crop.width+40; tmp.height=crop.height+40;
-            const tctx = tmp.getContext("2d");
-            tctx.fillStyle="#fff"; tctx.fillRect(0,0,tmp.width,tmp.height);
-            const tmpId = tctx.getImageData(0,0,tmp.width,tmp.height);
-            for(let y=0;y<crop.height;y++)
-                for(let x=0;x<crop.width;x++){
-                    const si=(y*crop.width+x)*4, di=((y+20)*tmp.width+(x+20))*4;
-                    tmpId.data[di]=tmpId.data[di+1]=tmpId.data[di+2]=px[si];
-                    tmpId.data[di+3]=255;
-                }
-            tctx.putImageData(tmpId,0,0);
-
-            const worker = await Tesseract.createWorker('eng');
-            await worker.setParameters({
-                tessedit_char_whitelist: '0123456789.kmKM ',
-                tessedit_pageseg_mode: '6'
-            });
-            const result = await worker.recognize(tmp.toDataURL('image/png'));
-            await worker.terminate();
-
-            const nums = [];
-            for(const word of result.data.words){
-                let t = word.text.toLowerCase().replace(/,/g,'.').replace(/\s/g,'');
-                t = t.replace(/[^0-9\.km]/g,'').replace(/\.$/,'');
-                const conf = word.confidence;
-                if(conf > 50 && /^\d+\.?\d*[km]$/.test(t)){
-                    nums.push({text:t, x:word.bbox.x0/SCALE, conf});
-                }
-            }
-            return nums;
-        }
-
-        // ── نجرب عتبات متعددة ────────────────────────────────────
-        let bestNums = [];
-        for(const thresh of [120, 140, 100, 160]){
-            const nums = await readWithThresh(thresh);
-            console.log(`🔢 عتبة ${thresh}:`, nums.map(n=>`${n.text}@${Math.round(n.x/W*100)}%`));
-            if(nums.length > bestNums.length) bestNums = nums;
-            if(bestNums.length >= 3) break;
-        }
-
-        console.log("✅ أفضل نتيجة:", bestNums);
-
-        // ── تعيين الأرقام للخانات حسب الموضع ────────────────────
-        const centers = {inf: W*0.25, sni: W*0.50, cav: W*0.75};
-        const result  = {inf:"0", sni:"0", cav:"0"};
-        const assigned = new Set();
-
-        const sorted = [...bestNums].sort((a,b)=>a.x-b.x);
-
-        if(sorted.length >= 3){
-            result.inf = sorted[0].text;
-            result.sni = sorted[1].text;
-            result.cav = sorted[2].text;
-        } else {
-            for(const n of sorted){
-                let best = null, bestDist = Infinity;
-                for(const [k,cx] of Object.entries(centers)){
-                    if(assigned.has(k)) continue;
-                    const d = Math.abs(n.x - cx);
-                    if(d < bestDist){ bestDist=d; best=k; }
-                }
-                if(best){ result[best]=n.text; assigned.add(best); }
-            }
-        }
-
-        if(result.inf==="0" && result.sni==="0" && result.cav==="0"){
-            throw new Error("لم يتم العثور على أرقام القوات. تأكد أن الصورة تقرير استطلاع واضح.");
-        }
-
-        document.getElementById("enInf").value = result.inf;
-        document.getElementById("enSni").value = result.sni;
-        document.getElementById("enCav").value = result.cav;
-
-        toast(`✅ ${result.inf} · ${result.sni} · ${result.cav}`);
-        setTimeout(() => smartAnalyze(), 400);
-
-    } catch(err) {
-        console.error("❌ خطأ:", err);
-        showSiteError(err.message || "حدث خطأ أثناء قراءة الصورة.");
-    } finally {
-        overlay.style.display = "none";
-        document.querySelectorAll('.upload-btn input[type="file"]').forEach(i => i.value = "");
-    }
-}
-    const file = event.target.files[0];
-    if (!file) return;
-
-    showUploadPreview(file);
-    document.getElementById("out").classList.remove("error");
-
-    const overlay = document.getElementById("loadingOverlay");
-    const loadingTxt = document.getElementById("loadingText");
-    overlay.style.display = "flex";
-    if (loadingTxt) loadingTxt.innerText = "🔍 جاري قراءة التقرير...";
-    await new Promise(r => setTimeout(r, 40));
-
-    try {
-        if (typeof Tesseract === 'undefined') throw new Error("مكتبة القراءة لم تُحمَّل بعد، انتظر ثم حاول مجدداً.");
-
-        // ── تحميل الصورة ──────────────────────────────────────────
-        const img = new Image();
-        img.src = URL.createObjectURL(file);
-        await new Promise((res, rej) => { img.onload = res; img.onerror = () => rej("فشل تحميل الصورة"); });
-        const W = img.width, H = img.height;
-
-        // ── رسم الصورة كاملة لفحص الألوان ────────────────────────
-        const full = document.createElement("canvas");
-        full.width = W; full.height = H;
-        const fctx = full.getContext("2d");
-        fctx.drawImage(img, 0, 0);
-        const pixels = fctx.getImageData(0, 0, W, H).data;
-
-        // ── دالة: حساب متوسط ألوان سطر ────────────────────────────
-        function rowAvg(y) {
-            let r=0, g=0, b=0, n=0;
-            const x0 = Math.floor(W*0.1), x1 = Math.floor(W*0.9);
-            for (let x = x0; x < x1; x++) {
-                const i = (y*W+x)*4;
-                r+=pixels[i]; g+=pixels[i+1]; b+=pixels[i+2]; n++;
-            }
-            return { r:r/n, g:g/n, b:b/n };
-        }
-
-        // ── نبحث عن نقطة الانتقال: بني → فاتح ────────────────────
-        // الشريط البني: R≈178, G≈152, B≈119  (R-B ≈ 59)
-        // الخلفية الفاتحة للأرقام: R≈232, G≈220, B≈204 (R-B ≈ 28, R>200)
-        let transitionY = -1;
-        for (let y = Math.floor(H*0.20); y < Math.floor(H*0.75); y++) {
-            const prev = rowAvg(Math.max(0, y-3));
-            const curr = rowAvg(y);
-            // الشريط البني: R بين 150-200، R-B بين 45-75
-            const prevIsBrown = prev.r > 150 && prev.r < 200 && (prev.r - prev.b) > 45 && (prev.r - prev.b) < 75;
-            // الخلفية الفاتحة: R > 200 وفرق R-B صغير
-            const currIsLight = curr.r > 200 && curr.g > 190 && curr.b > 170;
-            if (prevIsBrown && currIsLight) {
-                transitionY = y;
-                break;
-            }
-        }
-
-        console.log("🎯 نقطة الانتقال:", transitionY, "/ ارتفاع الصورة:", H);
-
-        // ── تحديد منطقة الأرقام ────────────────────────────────────
-        // الأرقام تظهر في أول 15% بعد الانتقال
-        let cropY, cropH;
-        if (transitionY > 0) {
-            cropY = transitionY + Math.floor(H * 0.01);
-            cropH = Math.floor(H * 0.15);
-        } else {
-            // fallback: نسبة ثابتة
-            cropY = Math.floor(H * 0.42);
-            cropH = Math.floor(H * 0.15);
-        }
-
-        console.log(`✂️ القطع: Y=${cropY} H=${cropH} (${(cropY/H*100).toFixed(1)}% - ${((cropY+cropH)/H*100).toFixed(1)}%)`);
-
-        // ── قطع وتكبير منطقة الأرقام (3x) ───────────────────────
-        const SCALE = 3;
-        const crop = document.createElement("canvas");
-        crop.width  = W * SCALE;
-        crop.height = cropH * SCALE;
-        const cctx = crop.getContext("2d");
-        cctx.drawImage(img, 0, cropY, W, cropH, 0, 0, crop.width, crop.height);
-
-        // ── تحسين: رمادي + تباين عالٍ ────────────────────────────
-        const idata = cctx.getImageData(0, 0, crop.width, crop.height);
-        const px = idata.data;
-        for (let i = 0; i < px.length; i += 4) {
-            let gray = px[i]*0.299 + px[i+1]*0.587 + px[i+2]*0.114;
-            // تعديل التباين: نص داكن على خلفية فاتحة
-            gray = gray < 160 ? 0 : 255;
-            px[i] = px[i+1] = px[i+2] = gray;
-        }
-        cctx.putImageData(idata, 0, 0);
-
-        // ── تشغيل Tesseract بوضع سطر واحد ────────────────────────
-        const worker = await Tesseract.createWorker('eng');
-        await worker.setParameters({
-            tessedit_char_whitelist: '0123456789.kmKM ',
-            tessedit_pageseg_mode: '7'
+        // ===== تحويل الصورة إلى base64 =====
+        const base64 = await new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result.split(",")[1]);
+            reader.onerror = () => reject("فشل قراءة الملف");
+            reader.readAsDataURL(file);
         });
-        const result = await worker.recognize(crop.toDataURL('image/png'));
-        await worker.terminate();
 
-        console.log("📖 Tesseract:", result.data.text);
+        const mediaType = file.type || "image/jpeg";
 
-        // ── استخراج الأرقام مع مواضعها ────────────────────────────
-        function extractNums(words) {
-            return words
-                .map(w => {
-                    let t = w.text.toLowerCase()
-                        .replace(/,/g,'.').replace(/[oO]/g,'0')
-                        .replace(/[lLiI|]/g,'1').replace(/[sS]/g,'5');
-                    let cl = t.replace(/[^0-9\.km]/g,'').replace(/\.$/,'');
-                    if (/^\d+\.?\d*[km]$|^0$/.test(cl)) {
-                        return { text: cl, x: w.bbox.x0 };
-                    }
-                    return null;
-                })
-                .filter(Boolean)
-                .sort((a,b) => a.x - b.x);
+        // ===== إرسال الصورة للـ Worker (الـ Key مخفي في السيرفر) =====
+        const response = await fetch(WORKER_URL, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                model: "claude-sonnet-4-20250514",
+                max_tokens: 200,
+                messages: [{
+                    role: "user",
+                    content: [
+                        {
+                            type: "image",
+                            source: { type: "base64", media_type: mediaType, data: base64 }
+                        },
+                        {
+                            type: "text",
+                            text: `أنت نظام استخراج بيانات دقيق من تقارير استطلاع لعبة West Game.
+
+ابحث في الصورة عن قسم "إجمالي القوات" أو "Total Forces".
+في هذا القسم يوجد صف من 3 أرقام كبيرة مع أيقونات صغيرة فوق كل رقم.
+
+ترتيب الأيقونات من اليسار إلى اليمين في الصورة:
+1. الأيقونة اليسرى (أيقونة سيف أو درع أو محارب) = المقاتل fighter
+2. الأيقونة الوسطى (أيقونة بندقية أو رشاش) = القناص sniper
+3. الأيقونة اليمنى (أيقونة حصان) = الجوال cavalry
+
+قواعد مهمة جداً:
+- اقرأ فقط الصف الأول من الأرقام مباشرة تحت عنوان "إجمالي القوات"
+- تجاهل تماماً الأرقام في صفوف الوحدات التفصيلية (مثل مستوى VIII أو IX أو X)
+- الأرقام تظهر بصيغ مثل: 945.0k أو 1.1m أو 640.0k أو 0
+- حوّل أي حرف K أو M كبير إلى صغير (k أو m)
+- إذا كانت القيمة صفراً اكتب بالضبط: 0
+
+أجب فقط بهذا JSON بدون أي نص إضافي أو backticks:
+{"fighter":"???","sniper":"???","cavalry":"???"}`
+                        }
+                    ]
+                }]
+            })
+        });
+
+        if (!response.ok) {
+            const errData = await response.json().catch(() => ({}));
+            throw new Error(errData?.error?.message || `HTTP ${response.status}`);
         }
 
-        let nums = extractNums(result.data.words);
-        console.log("🔢 أرقام مع مواضع:", nums);
+        const data = await response.json();
+        const rawText = data.content?.map(b => b.text || "").join("").trim();
 
-        // ── إذا لم نجد كافياً، نوسّع القطع ───────────────────────
-        if (nums.length < 2 && transitionY > 0) {
-            const crop2 = document.createElement("canvas");
-            const cropH2 = Math.floor(H * 0.22);
-            crop2.width  = W * SCALE;
-            crop2.height = cropH2 * SCALE;
-            const ctx2 = crop2.getContext("2d");
-            ctx2.drawImage(img, 0, transitionY, W, cropH2, 0, 0, crop2.width, crop2.height);
+        console.log("🤖 Claude رد بـ:", rawText);
 
-            const id2 = ctx2.getImageData(0,0,crop2.width,crop2.height);
-            for (let i=0;i<id2.data.length;i+=4) {
-                let g = id2.data[i]*0.299+id2.data[i+1]*0.587+id2.data[i+2]*0.114;
-                g = g < 160 ? 0 : 255;
-                id2.data[i]=id2.data[i+1]=id2.data[i+2]=g;
-            }
-            ctx2.putImageData(id2,0,0);
-
-            const w2 = await Tesseract.createWorker('eng');
-            await w2.setParameters({ tessedit_char_whitelist:'0123456789.kmKM ', tessedit_pageseg_mode:'6' });
-            const r2 = await w2.recognize(crop2.toDataURL('image/png'));
-            await w2.terminate();
-            console.log("📖 محاولة ثانية:", r2.data.text);
-            nums = extractNums(r2.data.words);
+        // ===== تحليل الرد =====
+        let parsed;
+        try {
+            const clean = rawText.replace(/```json|```/gi, "").trim();
+            parsed = JSON.parse(clean);
+        } catch(e) {
+            // محاولة استخراج بالـ regex إذا فشل JSON
+            const extract = (label) => {
+                const m = rawText.match(new RegExp(`"${label}"\\s*:\\s*"([^"]+)"`));
+                return m ? m[1] : "0";
+            };
+            parsed = {
+                fighter:  extract("fighter"),
+                sniper:   extract("sniper"),
+                cavalry:  extract("cavalry")
+            };
         }
 
-        // ── تعيين الثلاث خانات حسب الموضع الأفقي ─────────────────
-        // الخانات الثلاث موزعة على عرض الصورة بالتساوي تقريباً:
-        // مقاتل: 0-33%  |  قناص: 33-66%  |  جوال: 66-100%
-        let inf = "0", sni = "0", cav = "0";
-        const cropW = W; // عرض الصورة الأصلي
+        // ===== تطبيع القيم (إزالة مسافات، تحويل K/M لصغير، إزالة فواصل) =====
+        const normalizeVal = v => (v || "0").toString().toLowerCase().trim().replace(/,/g, "").replace(/\s/g, "");
 
-        if (nums.length >= 3) {
-            inf = nums[0].text;
-            sni = nums[1].text;
-            cav = nums[2].text;
-        } else if (nums.length === 2) {
-            const x1 = nums[0].x / SCALE; // موضع بالنسبة للصورة الأصلية
-            const x2 = nums[1].x / SCALE;
-            if (x1 > cropW * 0.30) {
-                // كلاهما في الوسط واليمين → المقاتل صفر
-                inf = "0"; sni = nums[0].text; cav = nums[1].text;
-            } else if (x2 < cropW * 0.65) {
-                // كلاهما في اليسار والوسط → الجوال صفر
-                inf = nums[0].text; sni = nums[1].text; cav = "0";
-            } else {
-                // الأول يسار والثاني يمين → القناص صفر
-                inf = nums[0].text; sni = "0"; cav = nums[1].text;
-            }
-        } else if (nums.length === 1) {
-            inf = nums[0].text;
+        const inf = normalizeVal(parsed.fighter);
+        const sni = normalizeVal(parsed.sniper);
+        const cav = normalizeVal(parsed.cavalry);
+
+        // ===== التحقق من صحة النتيجة =====
+        const isValid = v => /^\d+\.?\d*[km]$|^0$/.test(v);
+
+        const validCount = [inf, sni, cav].filter(isValid).length;
+        if (validCount === 0) {
+            throw new Error("لم يتمكن Claude من التعرف على أرقام القوات في هذه الصورة.");
         }
 
-        if (inf==="0" && sni==="0" && cav==="0") {
-            throw new Error("لم يتم العثور على أرقام القوات. تأكد أن الصورة تقرير استطلاع واضح.");
-        }
+        // تصحيح أي قيمة غير صالحة إلى "0" بدلاً من تمريرها خاطئة
+        const safeInf = isValid(inf) ? inf : "0";
+        const safeSni = isValid(sni) ? sni : "0";
+        const safeCav = isValid(cav) ? cav : "0";
 
-        document.getElementById("enInf").value = inf;
-        document.getElementById("enSni").value = sni;
-        document.getElementById("enCav").value = cav;
+        document.getElementById("enInf").value = safeInf;
+        document.getElementById("enSni").value = safeSni;
+        document.getElementById("enCav").value = safeCav;
 
-        toast(`✅ ${inf} · ${sni} · ${cav}`);
+        // ===== إضافة توست مخصص يعرض الأرقام =====
+        toast(`✅ ${safeInf} · ${safeSni} · ${safeCav}`);
         setTimeout(() => smartAnalyze(), 400);
 
     } catch(err) {
-        console.error("❌ خطأ:", err);
-        showSiteError(err.message || "حدث خطأ أثناء قراءة الصورة.");
+        console.error("❌ خطأ في Claude API:", err);
+        const msg = err.message?.includes("401") ? "مفتاح API غير صالح." :
+                    err.message?.includes("429") ? "تجاوزت حد الطلبات، انتظر قليلاً." :
+                    err.message?.includes("fetch") ? "تعذر الوصول للإنترنت." :
+                    (err.message || "حدث خطأ غير متوقع.");
+        showSiteError(msg);
     } finally {
         overlay.style.display = "none";
         document.querySelectorAll('.upload-btn input[type="file"]').forEach(i => i.value = "");
