@@ -17,8 +17,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800;900&display=swap" rel="stylesheet">
 
-<!-- تحميل مكتبة الذكاء الاصطناعي -->
-<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js" async defer></script>
+<!-- Claude API تستخدم مباشرة من المتصفح -->
 
 <style>
   :root {
@@ -135,12 +134,53 @@
 
   .box { border: 1px solid var(--border); border-radius: 24px; padding: 24px; margin: 10px 0; background: var(--card); box-shadow: 0 10px 30px var(--shadow); transition: all 0.3s ease; position: relative; z-index: 2; }
 
-  .upload-area { border: 2px dashed var(--btn); border-radius: 16px; padding: 20px; text-align: center; margin-bottom: 20px; background: var(--primary-glow); cursor: pointer; transition: all 0.3s ease; position: relative; overflow: hidden; }
-  .upload-area:hover { background: var(--btn); color: var(--btnText); }
-  .upload-area input[type="file"] { position: absolute; top: 0; left: 0; right: 0; bottom: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; z-index: 5; }
-  .upload-icon { font-size: 28px; margin-bottom: 8px; display: block; pointer-events: none; }
-  .upload-text { font-weight: 800; font-size: 15px; pointer-events: none; }
-  .upload-subtext { font-size: 12px; opacity: 0.8; margin-top: 5px; font-weight: 500; pointer-events: none; }
+  /* ===== منطقة رفع الصورة الجديدة ===== */
+  .upload-section { margin-bottom: 22px; }
+
+  /* ===== (API Key مدمج في الـ Worker — لا حاجة لحقل إدخال) ===== */
+  .upload-label { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 700; color: var(--muted); margin-bottom: 10px; text-transform: uppercase; letter-spacing: 1px; }
+  .upload-label::before, .upload-label::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+
+  .upload-btns { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+
+  .upload-btn {
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 8px; padding: 16px 8px; border-radius: 18px; border: 1.5px solid var(--border);
+    background: var(--card); cursor: pointer; transition: all 0.22s cubic-bezier(.34,1.56,.64,1);
+    position: relative; overflow: hidden; text-align: center;
+    box-shadow: 0 2px 12px var(--shadow);
+  }
+  .upload-btn input[type="file"] {
+    position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; z-index: 5;
+  }
+  .upload-btn:hover { transform: translateY(-3px) scale(1.04); box-shadow: 0 8px 24px var(--shadow-hover); border-color: var(--btn); }
+  .upload-btn:active { transform: scale(0.97); }
+
+  .upload-btn-icon {
+    width: 46px; height: 46px; border-radius: 14px; display: flex; align-items: center; justify-content: center;
+    font-size: 22px; transition: transform 0.3s ease;
+  }
+  .upload-btn:hover .upload-btn-icon { transform: scale(1.12) rotate(-5deg); }
+
+  .upload-btn-label { font-size: 12px; font-weight: 800; color: var(--text); line-height: 1.2; pointer-events: none; }
+  .upload-btn-sub   { font-size: 10px; font-weight: 500; color: var(--muted); pointer-events: none; }
+
+  .upload-btn.gallery  .upload-btn-icon { background: linear-gradient(135deg,#fbbf24,#d97706); }
+  .upload-btn.camera   .upload-btn-icon { background: linear-gradient(135deg,#34d399,#059669); }
+  .upload-btn.file     .upload-btn-icon { background: linear-gradient(135deg,#818cf8,#4f46e5); }
+
+  .upload-preview {
+    display: none; align-items: center; gap: 12px; margin-top: 12px;
+    padding: 10px 14px; border-radius: 14px;
+    background: linear-gradient(135deg,rgba(52,211,153,.12),rgba(5,150,105,.06));
+    border: 1px solid rgba(52,211,153,.35);
+  }
+  .upload-preview.show { display: flex; }
+  .upload-preview-thumb { width: 42px; height: 42px; border-radius: 10px; object-fit: cover; flex-shrink: 0; box-shadow: 0 2px 8px rgba(0,0,0,.15); }
+  .upload-preview-info  { flex: 1; min-width: 0; }
+  .upload-preview-name  { font-size: 13px; font-weight: 700; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .upload-preview-size  { font-size: 11px; color: var(--muted); margin-top: 2px; }
+  .upload-preview-close { background: none; border: none; font-size: 18px; cursor: pointer; color: var(--muted); padding: 0 4px; flex-shrink: 0; }
   
   .loading-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); display: none; align-items: center; justify-content: center; flex-direction: column; color: white; font-weight: bold; z-index: 999; border-radius: 24px; }
   .spinner { width: 45px; height: 45px; border: 4px solid rgba(255,255,255,0.2); border-top-color: var(--btn); border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 15px; }
@@ -239,11 +279,46 @@
     <div id="loadingText" style="font-size: 16px; text-align:center;">🤖 جاري تحليل الأرقام بدقة عالية...</div>
   </div>
 
-  <div class="upload-area" id="uploadArea">
-    <span class="upload-icon">📸</span>
-    <div class="upload-text" id="uploadText">اضغط هنا لرفع صورة (تقرير الاستطلاع)</div>
-    <div class="upload-subtext" id="uploadSubText">سيقوم الذكاء الاصطناعي بتعبئة الأرقام تلقائياً!</div>
-    <input type="file" id="imageInput" accept="image/*" onchange="handleImageUpload(event)">
+  <!-- منطقة رفع الصورة الجديدة -->
+  <div class="upload-section" id="uploadArea">
+    <div class="upload-label" id="uploadText">📷 رفع تقرير الاستطلاع</div>
+
+    <div class="upload-btns">
+      <!-- مكتبة الصور -->
+      <div class="upload-btn gallery">
+        <input type="file" id="imageInput" accept="image/*" onchange="handleImageUpload(event)">
+        <div class="upload-btn-icon">🖼️</div>
+        <div class="upload-btn-label" id="uploadLblGallery">مكتبة الصور</div>
+        <div class="upload-btn-sub" id="uploadSubGallery">اختر من ألبومك</div>
+      </div>
+
+      <!-- التقاط صورة -->
+      <div class="upload-btn camera">
+        <input type="file" accept="image/*" capture="environment" onchange="handleImageUpload(event)">
+        <div class="upload-btn-icon">📷</div>
+        <div class="upload-btn-label" id="uploadLblCamera">التقاط صورة</div>
+        <div class="upload-btn-sub" id="uploadSubCamera">افتح الكاميرا</div>
+      </div>
+
+      <!-- اختيار ملف -->
+      <div class="upload-btn file">
+        <input type="file" accept="image/*,.png,.jpg,.jpeg,.webp" onchange="handleImageUpload(event)">
+        <div class="upload-btn-icon">📁</div>
+        <div class="upload-btn-label" id="uploadLblFile">اختيار ملف</div>
+        <div class="upload-btn-sub" id="uploadSubFile">من الجهاز</div>
+      </div>
+
+    </div>
+
+    <!-- معاينة الصورة المرفوعة -->
+    <div class="upload-preview" id="uploadPreview">
+      <img class="upload-preview-thumb" id="uploadThumb" src="" alt="preview">
+      <div class="upload-preview-info">
+        <div class="upload-preview-name" id="uploadFileName">—</div>
+        <div class="upload-preview-size" id="uploadFileSize">—</div>
+      </div>
+      <button class="upload-preview-close" onclick="clearUpload()" title="إلغاء">✕</button>
+    </div>
   </div>
 
   <div class="inputs-container">
@@ -336,167 +411,147 @@ function showSiteError(msg) {
     document.getElementById("smartBox").style.display = "none";
 }
 
-/* ================== الذكاء الاصطناعي للصورة (سريع ومانع للتجميد) ================== */
+/* ================== دوال معاينة الصورة ================== */
+function showUploadPreview(file) {
+    const preview = document.getElementById("uploadPreview");
+    const thumb   = document.getElementById("uploadThumb");
+    const name    = document.getElementById("uploadFileName");
+    const size    = document.getElementById("uploadFileSize");
+    if (!preview) return;
+    const url = URL.createObjectURL(file);
+    thumb.src = url;
+    name.innerText = file.name.length > 28 ? file.name.substring(0,25)+"..." : file.name;
+    const kb = (file.size / 1024).toFixed(0);
+    size.innerText = kb > 1024 ? (kb/1024).toFixed(1)+" MB" : kb+" KB";
+    preview.classList.add("show");
+}
+function clearUpload() {
+    document.getElementById("uploadPreview").classList.remove("show");
+    document.getElementById("uploadThumb").src = "";
+    // reset all file inputs
+    document.querySelectorAll('.upload-btn input[type="file"]').forEach(i => i.value = "");
+}
+
+/* ================== قراءة الصورة بـ Claude API (عبر Worker) ================== */
+
+// ← ضع رابط الـ Worker بعد رفعه على Cloudflare
+const WORKER_URL = "https://daly-claude.xcxc054.workers.dev"";
+
 async function handleImageUpload(event) {
     const file = event.target.files[0];
     if (!file) return;
 
+    showUploadPreview(file);
+
     const t = T[LANG] || T.ar;
     document.getElementById("out").classList.remove("error");
 
-    if (typeof Tesseract === 'undefined') {
-        showSiteError("مكتبة الذكاء الاصطناعي لم يتم تحميلها بعد. الرجاء الانتظار قليلاً أو إدخال الأرقام يدوياً.");
-        document.getElementById("imageInput").value = ""; 
-        return;
-    }
-
     const overlay = document.getElementById("loadingOverlay");
+    const loadingText = document.getElementById("loadingText");
     overlay.style.display = "flex";
-
-    // إعطاء المتصفح فرصة 50 جزء من الثانية ليرسم شاشة التحميل قبل أن نبدأ بحرق المعالج!
-    await new Promise(resolve => setTimeout(resolve, 50));
+    if (loadingText) loadingText.innerText = "🤖 Claude يقرأ التقرير...";
 
     try {
-        const img = new Image();
-        img.src = URL.createObjectURL(file);
-        await new Promise((resolve, reject) => {
-            img.onload = resolve;
-            img.onerror = () => reject("فشل تحميل الصورة.");
+        // ===== تحويل الصورة إلى base64 =====
+        const base64 = await new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result.split(",")[1]);
+            reader.onerror = () => reject("فشل قراءة الملف");
+            reader.readAsDataURL(file);
         });
 
-        // ===== نقطع الصورة من 35% إلى 75% - المنطقة التي تظهر فيها أرقام الإجمالي دائماً =====
-        const startY   = img.height * 0.35;
-        const sliceH   = img.height * 0.40;
+        const mediaType = file.type || "image/jpeg";
 
-        let scale = 1;
-        if (img.width < 600)       scale = 2.5;
-        else if (img.width > 1200) scale = 1200 / img.width;
+        // ===== إرسال الصورة للـ Worker (الـ Key مخفي في السيرفر) =====
+        const response = await fetch(WORKER_URL, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                model: "claude-sonnet-4-20250514",
+                max_tokens: 200,
+                messages: [{
+                    role: "user",
+                    content: [
+                        {
+                            type: "image",
+                            source: { type: "base64", media_type: mediaType, data: base64 }
+                        },
+                        {
+                            type: "text",
+                            text: `أنت أداة استخراج بيانات دقيقة من تقارير الاستطلاع في لعبة West Game.
 
-        const canvas = document.createElement('canvas');
-        const ctx    = canvas.getContext('2d');
-        canvas.width  = img.width  * scale;
-        canvas.height = sliceH     * scale;
+في هذه الصورة يوجد قسم "إجمالي القوات" يحتوي على 3 أنواع من الجنود مرتبة أفقياً:
+- 🔨 المقاتل (Fighter/Infantry) — الأيقونة الأولى من اليسار
+- 🔫 القناص (Sniper) — الأيقونة الوسطى
+- 🐴 الجوال (Cavalry) — الأيقونة الأخيرة من اليمين
 
-        ctx.imageSmoothingEnabled = true;
-        ctx.imageSmoothingQuality = 'high';
-        ctx.drawImage(img, 0, startY, img.width, sliceH, 0, 0, canvas.width, canvas.height);
+مهمتك: استخرج فقط الأرقام الإجمالية الثلاثة (السطر العلوي مباشرةً تحت عنوان "إجمالي القوات") بالصيغة الموجودة (مثل: 360.0k أو 1.1m أو 0).
 
-        // ===== تحسين التباين لتوضيح الأرقام =====
-        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-        const d = imageData.data;
-        for (let i = 0; i < d.length; i += 4) {
-            let g = d[i] * 0.299 + d[i+1] * 0.587 + d[i+2] * 0.114;
-            g = (g - 128) * 2.2 + 128;
-            if (g > 255) g = 255; else if (g < 0) g = 0;
-            d[i] = d[i+1] = d[i+2] = g;
-        }
-        ctx.putImageData(imageData, 0, 0);
+أجب فقط بهذا JSON بدون أي نص إضافي أو backticks:
+{"fighter":"???","sniper":"???","cavalry":"???"}`
+                        }
+                    ]
+                }]
+            })
+        });
 
-        const processedImage = canvas.toDataURL('image/png');
-
-        const worker = await Tesseract.createWorker('eng');
-        await worker.setParameters({ tessedit_char_whitelist: '0123456789.,kmKM ' });
-        const ret = await worker.recognize(processedImage);
-        await worker.terminate();
-
-        // ===== تنظيف وفلترة الكلمات المقروءة =====
-        // نقبل فقط أرقام بصيغة: 0 أو 1.1m أو 360.0k أو أي رقم+k أو رقم+m
-        const numRegex = /^\d+\.?\d*[km]$|^0$/i;
-        let validNumbers = [];
-
-        for (let word of ret.data.words) {
-            let text = word.text.toLowerCase()
-                .replace(/,/g, '.').replace(/[oO]/g, '0')
-                .replace(/[lL|iI]/g, '1').replace(/[sS]/g, '5');
-            let clean = text.replace(/[^0-9\.km]/g, '').replace(/\.$/, '');
-
-            // ✅ نقبل فقط أرقام القوات (رقم + k أو m) أو صفر
-            if (clean && numRegex.test(clean)) {
-                validNumbers.push({ text: clean, x: word.bbox.x0, y: word.bbox.y0 });
-            }
+        if (!response.ok) {
+            const errData = await response.json().catch(() => ({}));
+            throw new Error(errData?.error?.message || `HTTP ${response.status}`);
         }
 
-        console.log("✅ أرقام القوات المكتشفة:", validNumbers.map(n => n.text));
+        const data = await response.json();
+        const rawText = data.content?.map(b => b.text || "").join("").trim();
 
-        // ===== تجميع الأرقام في صفوف أفقية =====
-        validNumbers.sort((a, b) => a.y - b.y);
-        let rows = [];
-        if (validNumbers.length > 0) {
-            let cur = [validNumbers[0]];
-            const thresh = Math.max(30, canvas.height * 0.06);
-            for (let i = 1; i < validNumbers.length; i++) {
-                if (Math.abs(validNumbers[i].y - cur[0].y) < thresh) {
-                    cur.push(validNumbers[i]);
-                } else {
-                    rows.push(cur);
-                    cur = [validNumbers[i]];
-                }
-            }
-            rows.push(cur);
+        console.log("🤖 Claude رد بـ:", rawText);
+
+        // ===== تحليل الرد =====
+        let parsed;
+        try {
+            const clean = rawText.replace(/```json|```/gi, "").trim();
+            parsed = JSON.parse(clean);
+        } catch(e) {
+            // محاولة استخراج بالـ regex إذا فشل JSON
+            const extract = (label) => {
+                const m = rawText.match(new RegExp(`"${label}"\\s*:\\s*"([^"]+)"`));
+                return m ? m[1] : "0";
+            };
+            parsed = {
+                fighter:  extract("fighter"),
+                sniper:   extract("sniper"),
+                cavalry:  extract("cavalry")
+            };
         }
 
-        console.log("📊 الصفوف:", rows.map(r => r.map(n=>n.text)));
+        const inf = (parsed.fighter || "0").toLowerCase().trim();
+        const sni = (parsed.sniper  || "0").toLowerCase().trim();
+        const cav = (parsed.cavalry || "0").toLowerCase().trim();
 
-        // ===== البحث عن سطر الإجمالي =====
-        // القاعدة الذهبية: سطر الإجمالي هو أول سطر فيه 3 أرقام كلها k أو m
-        // أو أول سطر فيه على الأقل رقمان k/m في 2-3 عناصر
-        let targetRow = null;
+        // ===== التحقق من صحة النتيجة =====
+        const isValid = v => /^\d+\.?\d*[km]$|^0$/i.test(v);
 
-        // أولاً: نبحث عن سطر بـ 3 أرقام k/m (المثالي)
-        targetRow = rows.find(r => r.length === 3 && r.every(n => /[km]/i.test(n.text)));
-
-        // ثانياً: إذا لم نجد، نبحث عن سطر بـ 3 عناصر فيه رقمان k/m على الأقل
-        if (!targetRow) {
-            targetRow = rows.find(r => r.length === 3 && r.filter(n => /[km]/i.test(n.text)).length >= 2);
+        if (!isValid(inf) && !isValid(sni) && !isValid(cav)) {
+            throw new Error("لم يتمكن Claude من التعرف على أرقام القوات في هذه الصورة.");
         }
 
-        // ثالثاً: سطر بـ 2 أرقام k/m (حالة الصفر الغير مقروء)
-        if (!targetRow) {
-            targetRow = rows.find(r => r.length === 2 && r.filter(n => /[km]/i.test(n.text)).length === 2);
-        }
+        document.getElementById("enInf").value = inf;
+        document.getElementById("enSni").value = sni;
+        document.getElementById("enCav").value = cav;
 
-        // رابعاً: أي سطر فيه k أو m كحل أخير
-        if (!targetRow) {
-            targetRow = rows.find(r => r.some(n => /[km]/i.test(n.text)));
-        }
+        // ===== إضافة توست مخصص يعرض الأرقام =====
+        toast(`✅ ${inf} · ${sni} · ${cav}`);
+        setTimeout(() => smartAnalyze(), 400);
 
-        if (targetRow) {
-            targetRow.sort((a, b) => a.x - b.x);
-            let inf = "0", sni = "0", cav = "0";
-            const w = canvas.width;
-
-            if (targetRow.length >= 3) {
-                // الترتيب من اليسار: مقاتل | قناص | جوال (RTL في اللعبة)
-                inf = targetRow[0].text;
-                sni = targetRow[1].text;
-                cav = targetRow[2].text;
-            } else if (targetRow.length === 2) {
-                const n1 = targetRow[0], n2 = targetRow[1];
-                if (n1.x < w * 0.33 && n2.x > w * 0.63) {
-                    inf = n1.text; sni = "0"; cav = n2.text;
-                } else if (n1.x > w * 0.33) {
-                    inf = "0"; sni = n1.text; cav = n2.text;
-                } else {
-                    inf = n1.text; sni = n2.text; cav = "0";
-                }
-            }
-
-            document.getElementById("enInf").value = inf;
-            document.getElementById("enSni").value = sni;
-            document.getElementById("enCav").value = cav;
-
-            toast("✅ تمت قراءة الأرقام بنجاح!");
-            setTimeout(() => smartAnalyze(), 500);
-        } else {
-            console.log("❌ لم يُكتشف أي رقم قوات:", validNumbers);
-            showSiteError(t.ocrFail || "لم يتمكن الذكاء من قراءة الأرقام. الرجاء التأكد أن الصورة لتقرير الاستطلاع.");
-        }
     } catch(err) {
-        console.error("خطأ:", err);
-        showSiteError("حدث خطأ أثناء معالجة الصورة. حاول مرة أخرى.");
+        console.error("❌ خطأ في Claude API:", err);
+        const msg = err.message?.includes("401") ? "مفتاح API غير صالح." :
+                    err.message?.includes("429") ? "تجاوزت حد الطلبات، انتظر قليلاً." :
+                    err.message?.includes("fetch") ? "تعذر الوصول للإنترنت." :
+                    (err.message || "حدث خطأ غير متوقع.");
+        showSiteError(msg);
     } finally {
-        document.getElementById("loadingOverlay").style.display = "none";
-        document.getElementById("imageInput").value = "";
+        overlay.style.display = "none";
+        document.querySelectorAll('.upload-btn input[type="file"]').forEach(i => i.value = "");
     }
 }
 
@@ -550,8 +605,10 @@ const T = {
     smartWhy4: "لا توجد تهديدات ثانوية كبيرة من العدو تتطلب تغطية مكثفة.",
     smartWhy5: "النسبة المثالية بناءً على الحسبة هي",
     smartNote: "ملاحظة: هذه النسب تعتمد على تحليل رياضي لتقليل خسائرك للحد الأدنى.",
-    uploadText: "اضغط هنا لرفع صورة (تقرير الاستطلاع)",
-    uploadSubText: "سيقوم الذكاء الاصطناعي بتعبئة الأرقام تلقائياً!",
+    uploadText: "📷 رفع تقرير الاستطلاع",
+    uploadLblGallery: "مكتبة الصور", uploadSubGallery: "اختر من ألبومك",
+    uploadLblCamera: "التقاط صورة",  uploadSubCamera: "افتح الكاميرا",
+    uploadLblFile: "اختيار ملف",     uploadSubFile: "من الجهاز",
     loadingText: "🤖 جاري تحليل التقرير بدقة...",
     ocrFail: "الرجاء التأكد أن الصورة لتقرير الاستطلاع، وتكون الأرقام واضحة."
   },
@@ -603,8 +660,10 @@ const T = {
     smartWhy4: "There are no major secondary threats requiring heavy coverage.",
     smartWhy5: "The ideal calculated ratio is",
     smartNote: "Note: These ratios are based on mathematical analysis to minimize your losses.",
-    uploadText: "Click here to upload a screenshot (Scout Report)",
-    uploadSubText: "AI will auto-fill the numbers for you!",
+    uploadText: "📷 Upload Scout Report",
+    uploadLblGallery: "Gallery",       uploadSubGallery: "From your album",
+    uploadLblCamera: "Camera",         uploadSubCamera: "Take a photo",
+    uploadLblFile: "Browse File",      uploadSubFile: "From device",
     loadingText: "🤖 Analyzing screenshot accurately...",
     ocrFail: "Please ensure the image is a clear scout report."
   },
@@ -656,8 +715,10 @@ const T = {
     smartWhy4: "Não há grandes ameaças secundárias.",
     smartWhy5: "A proporção ideal calculada é",
     smartNote: "Nota: Estas proporções são baseadas em cálculos para minimizar suas perdas.",
-    uploadText: "Clique aqui para enviar captura de tela (Relatório)",
-    uploadSubText: "A IA preencherá os números automaticamente!",
+    uploadText: "📷 Enviar Relatório de Exploração",
+    uploadLblGallery: "Galeria",       uploadSubGallery: "Do seu álbum",
+    uploadLblCamera: "Câmera",         uploadSubCamera: "Tirar foto",
+    uploadLblFile: "Arquivo",          uploadSubFile: "Do dispositivo",
     loadingText: "🤖 Analisando imagem...",
     ocrFail: "Certifique-se de que a imagem é um relatório de exploração claro."
   }
@@ -691,8 +752,16 @@ function setLang(lang) {
   document.getElementById("copyBtn").innerHTML = t.copy;
   document.getElementById("shareBtn").innerHTML = t.share;
   document.getElementById("resetBtn").innerHTML = t.reset;
-  document.getElementById("uploadText").innerText = t.uploadText;
-  document.getElementById("uploadSubText").innerText = t.uploadSubText;
+  document.getElementById("uploadText").innerText = t.uploadText || "📷 رفع تقرير الاستطلاع";
+  // أزرار الرفع الجديدة
+  if(t.uploadLblGallery) { 
+    const el = document.getElementById("uploadLblGallery"); if(el) el.innerText = t.uploadLblGallery;
+    const el2 = document.getElementById("uploadSubGallery"); if(el2) el2.innerText = t.uploadSubGallery||"";
+    const el3 = document.getElementById("uploadLblCamera");  if(el3) el3.innerText = t.uploadLblCamera||"";
+    const el4 = document.getElementById("uploadSubCamera");  if(el4) el4.innerText = t.uploadSubCamera||"";
+    const el5 = document.getElementById("uploadLblFile");    if(el5) el5.innerText = t.uploadLblFile||"";
+    const el6 = document.getElementById("uploadSubFile");    if(el6) el6.innerText = t.uploadSubFile||"";
+  }
   document.getElementById("loadingText").innerText = t.loadingText;
   document.getElementById("ratioHint").innerText = t.ratioHint;
   document.getElementById("legendTitle").innerText = t.legendTitle;
@@ -996,7 +1065,7 @@ document.addEventListener("DOMContentLoaded", function() {
     const savedDark = safeGetStorage("F11_DARK"); 
     if(savedDark === "1") document.body.classList.add("dark"); 
     refreshDarkButtonText(); 
-    hideChart(); 
+    hideChart();
   } catch(error) {}
 });
 </script>
