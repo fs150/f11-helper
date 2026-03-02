@@ -436,17 +436,70 @@ function clearUpload() {
 
 /* ================== قراءة الصورة بـ Tesseract OCR (بدون API key) ================== */
 
-/* --- تحسين صورة كاملة --- */
-function makeOCRImage(file, scale, filterStr) {
+/* ─── Otsu's Method: إيجاد أفضل عتبة ثنائية تلقائياً لكل صورة ─── */
+function otsuThreshold(gray) {
+    const hist = new Array(256).fill(0);
+    for (let i = 0; i < gray.length; i++) hist[gray[i]]++;
+    const total = gray.length;
+    let sum = 0;
+    for (let i = 0; i < 256; i++) sum += i * hist[i];
+    let sumB = 0, wB = 0, maxVar = 0, bestT = 128;
+    for (let t = 0; t < 256; t++) {
+        wB += hist[t];
+        if (wB === 0) continue;
+        const wF = total - wB;
+        if (wF === 0) break;
+        sumB += t * hist[t];
+        const v = wB * wF * Math.pow(sumB/wB - (sum-sumB)/wF, 2);
+        if (v > maxVar) { maxVar = v; bestT = t; }
+    }
+    return bestT;
+}
+
+/* ─── صورة بـ Otsu binarization (أنظف بكثير من CSS contrast) ─── */
+function makeOtsuImage(file, scale, cropTop, cropBottom) {
     return new Promise((resolve, reject) => {
         const img = new Image();
         img.onload = () => {
+            const ct = cropTop || 0, cb = cropBottom || 1;
+            const sY = Math.floor(img.height * ct);
+            const sH = Math.floor(img.height * (cb - ct));
+            const W = Math.round(img.width * scale);
+            const H = Math.round(sH * scale);
             const canvas = document.createElement('canvas');
             const ctx = canvas.getContext('2d');
-            canvas.width  = img.width * scale;
-            canvas.height = img.height * scale;
-            ctx.filter = filterStr;
-            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+            canvas.width = W; canvas.height = H;
+            ctx.drawImage(img, 0, sY, img.width, sH, 0, 0, W, H);
+
+            const imgData = ctx.getImageData(0, 0, W, H);
+            const d = imgData.data;
+            const len = W * H;
+
+            // تحويل إلى رمادي
+            const gray = new Uint8Array(len);
+            for (let i = 0; i < len; i++)
+                gray[i] = Math.round(0.299*d[i*4] + 0.587*d[i*4+1] + 0.114*d[i*4+2]);
+
+            // Otsu threshold
+            const thr = otsuThreshold(gray);
+            console.log(`🎯 Otsu threshold=${thr} (crop ${ct}-${cb})`);
+
+            // تطبيق العتبة + عدّ البكسلات الداكنة
+            let darkCount = 0;
+            for (let i = 0; i < len; i++) {
+                const val = gray[i] > thr ? 255 : 0;
+                d[i*4] = d[i*4+1] = d[i*4+2] = val;
+                if (val === 0) darkCount++;
+            }
+
+            // قلب الألوان إذا الخلفية داكنة (نص فاتح على خلفية غامقة)
+            if (darkCount > len * 0.5) {
+                for (let i = 0; i < len; i++)
+                    d[i*4] = d[i*4+1] = d[i*4+2] = 255 - d[i*4];
+                console.log("🔄 Inverted (dark bg)");
+            }
+
+            ctx.putImageData(imgData, 0, 0);
             canvas.toBlob(blob => { resolve(blob); URL.revokeObjectURL(img.src); }, 'image/png');
         };
         img.onerror = () => reject(new Error("فشل تحميل الصورة"));
@@ -454,19 +507,20 @@ function makeOCRImage(file, scale, filterStr) {
     });
 }
 
-/* --- قص جزء من الصورة عمودياً (لتركيز OCR على منطقة القوات) --- */
-function makeCroppedOCRImage(file, scale, filterStr, topPct, bottomPct) {
+/* ─── صورة بفلتر CSS (grayscale + contrast) ─── */
+function makeFilterImage(file, scale, filterStr, cropTop, cropBottom) {
     return new Promise((resolve, reject) => {
         const img = new Image();
         img.onload = () => {
-            const srcY = Math.floor(img.height * topPct);
-            const srcH = Math.floor(img.height * (bottomPct - topPct));
+            const ct = cropTop || 0, cb = cropBottom || 1;
+            const sY = Math.floor(img.height * ct);
+            const sH = Math.floor(img.height * (cb - ct));
             const canvas = document.createElement('canvas');
             const ctx = canvas.getContext('2d');
-            canvas.width  = img.width * scale;
-            canvas.height = srcH * scale;
+            canvas.width  = Math.round(img.width * scale);
+            canvas.height = Math.round(sH * scale);
             ctx.filter = filterStr;
-            ctx.drawImage(img, 0, srcY, img.width, srcH, 0, 0, canvas.width, canvas.height);
+            ctx.drawImage(img, 0, sY, img.width, sH, 0, 0, canvas.width, canvas.height);
             canvas.toBlob(blob => { resolve(blob); URL.revokeObjectURL(img.src); }, 'image/png');
         };
         img.onerror = () => reject(new Error("فشل تحميل الصورة"));
@@ -474,13 +528,18 @@ function makeCroppedOCRImage(file, scale, filterStr, topPct, bottomPct) {
     });
 }
 
-/* --- تنظيف نص كلمة OCR لاستخراج رقم القوات --- */
+/* ─── تنظيف نص كلمة OCR + تصحيح أخطاء شائعة ─── */
 function cleanTroopWord(raw) {
-    let t = (raw || "").trim().toLowerCase().replace(/\s/g, '');
-    // إزالة أحرف غير مطلوبة من البداية والنهاية
+    let t = (raw || "").trim().replace(/\s/g, '');
+    // تصحيح أخطاء OCR الشائعة
+    t = t.replace(/[oO]/g, '0');
+    t = t.replace(/[lI|!]/g, '1');
+    t = t.replace(/,/g, '.');
+    t = t.toLowerCase();
+    // إزالة أحرف غير مطلوبة
     t = t.replace(/^[^0-9]+/, '');
-    t = t.replace(/[^0-9km]+$/, '');
-    // محاولة مطابقة نمط القوات
+    t = t.replace(/[^0-9km.]+$/, '');
+    // مطابقة نمط القوات
     const m = t.match(/(\d+\.?\d*[km])/i);
     if (m) return m[1];
     if (/^0$/.test(t)) return '0';
@@ -685,15 +744,15 @@ async function handleImageUpload(event) {
             throw new Error("مكتبة OCR لم تُحمَّل. تحقق من اتصال الإنترنت وأعد تحميل الصفحة.");
         }
 
-        // ① إنشاء 3 نسخ بإعدادات مختلفة
+        // ① إنشاء 3 نسخ بتقنيات مختلفة
         if (loadText) loadText.innerText = "🖼️ تحسين الصورة...";
         const [imgA, imgB, imgC] = await Promise.all([
-            // A: صورة كاملة، 2x، رمادي فقط (بدون whitelist → يقرأ 1.1m ككلمة)
-            makeOCRImage(file, 2, 'grayscale(100%)'),
-            // B: صورة كاملة، 2x، تباين عالي + whitelist (أرقام نظيفة)
-            makeOCRImage(file, 2, 'grayscale(100%) contrast(200%)'),
-            // C: قص وسط الصورة (15%-70%) + تباين متوسط (تركيز على منطقة القوات)
-            makeCroppedOCRImage(file, 2, 'grayscale(100%) contrast(150%)', 0.15, 0.70)
+            // A: Otsu binarization كاملة 3x → نص أسود على أبيض نظيف
+            makeOtsuImage(file, 3),
+            // B: CSS تباين عالي 2x + whitelist → أرقام نظيفة
+            makeFilterImage(file, 2, 'grayscale(100%) contrast(200%)'),
+            // C: Otsu + قص وسط الصورة (15%-70%) → تركيز على منطقة القوات فقط
+            makeOtsuImage(file, 3, 0.15, 0.70)
         ]);
 
         // ② تشغيل 3 تمريرات OCR بالتوازي
@@ -720,9 +779,9 @@ async function handleImageUpload(event) {
         ]);
 
         console.log("═══════════════════════════════════════");
-        console.log("🔍 Pass A (full, no-whitelist):", dataA.text);
-        console.log("🔍 Pass B (full, whitelist):", dataB.text);
-        console.log("🔍 Pass C (cropped, no-whitelist):", dataC.text);
+        console.log("🔍 Pass A (Otsu 3x, no-whitelist):", dataA.text);
+        console.log("🔍 Pass B (contrast 2x, whitelist):", dataB.text);
+        console.log("🔍 Pass C (Otsu cropped, no-whitelist):", dataC.text);
         console.log("═══════════════════════════════════════");
 
         // ③ استخراج القوات من كل نتيجة
@@ -736,11 +795,28 @@ async function handleImageUpload(event) {
 
         // ④ تصويت بالإجماع: اختيار أفضل قيمة لكل حقل
         if (loadText) loadText.innerText = "🧠 مقارنة النتائج...";
-        const final = consensusVote(
-            [parsedA, parsedB, parsedC],
-            [dataA,   dataB,   dataC]
-        );
+        let allParsed = [parsedA, parsedB, parsedC];
+        let allData   = [dataA,   dataB,   dataC];
 
+        // ⑤ إذا لم نجد أرقام كافية → تمريرة طوارئ رابعة (PSM 6 على الصورة المقصوصة)
+        const validCount = allParsed.reduce((n, p) => {
+            const v = [p?.fighter, p?.sniper, p?.cavalry].filter(x => isValidTroop(x));
+            return Math.max(n, v.length);
+        }, 0);
+
+        if (validCount < 2) {
+            console.log("⚠️ أرقام غير كافية → تمريرة طوارئ PSM 6...");
+            if (loadText) loadText.innerText = "🔄 محاولة إضافية...";
+            const imgD = await makeOtsuImage(file, 2.5, 0.10, 0.75);
+            const dataD = await runOCRPass(imgD, { tessedit_pageseg_mode: '6' }, () => {});
+            console.log("🔍 Pass D (emergency PSM6):", dataD.text);
+            const parsedD = extractFromData(dataD);
+            console.log("📊 Parsed D:", JSON.stringify(parsedD));
+            allParsed.push(parsedD);
+            allData.push(dataD);
+        }
+
+        const final = consensusVote(allParsed, allData);
         console.log("🏆 النتيجة النهائية:", JSON.stringify(final));
 
         const inf = (final.fighter || "0").toLowerCase();
