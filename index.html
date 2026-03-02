@@ -528,21 +528,98 @@ function makeFilterImage(file, scale, filterStr, cropTop, cropBottom) {
     });
 }
 
+/* ─── صورة مخصصة لرقم واحد (قص أفقي+عمودي + تباين + Otsu + حشوة) ─── */
+function makeNumberImage(file, scale, top, bottom, left, right) {
+    return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => {
+            const sX = Math.floor(img.width * (left || 0));
+            const sY = Math.floor(img.height * (top || 0));
+            const sW = Math.floor(img.width * ((right || 1) - (left || 0)));
+            const sH = Math.floor(img.height * ((bottom || 1) - (top || 0)));
+            if (sW < 5 || sH < 5) { resolve(null); return; }
+            const W = Math.round(sW * scale);
+            const H = Math.round(sH * scale);
+            const c1 = document.createElement('canvas');
+            const ctx = c1.getContext('2d');
+            c1.width = W; c1.height = H;
+            // تعزيز التباين قبل Otsu
+            ctx.filter = 'grayscale(1) contrast(2.5) brightness(1.1)';
+            ctx.drawImage(img, sX, sY, sW, sH, 0, 0, W, H);
+            ctx.filter = 'none';
+            // Otsu binarization
+            const imgData = ctx.getImageData(0, 0, W, H);
+            const d = imgData.data, len = W * H;
+            const gray = new Uint8Array(len);
+            for (let i = 0; i < len; i++)
+                gray[i] = Math.round(0.299*d[i*4] + 0.587*d[i*4+1] + 0.114*d[i*4+2]);
+            const thr = otsuThreshold(gray);
+            let darkCount = 0;
+            for (let i = 0; i < len; i++) {
+                const val = gray[i] > thr ? 255 : 0;
+                d[i*4] = d[i*4+1] = d[i*4+2] = val;
+                if (val === 0) darkCount++;
+            }
+            if (darkCount > len * 0.5) {
+                for (let i = 0; i < len; i++)
+                    d[i*4] = d[i*4+1] = d[i*4+2] = 255 - d[i*4];
+            }
+            ctx.putImageData(imgData, 0, 0);
+            // إضافة حشوة بيضاء (يساعد Tesseract على قراءة الحواف)
+            const pad = 30;
+            const c2 = document.createElement('canvas');
+            const p = c2.getContext('2d');
+            c2.width = W + pad*2; c2.height = H + pad*2;
+            p.fillStyle = '#fff';
+            p.fillRect(0, 0, c2.width, c2.height);
+            p.drawImage(c1, pad, pad);
+            c2.toBlob(blob => { resolve(blob); URL.revokeObjectURL(img.src); }, 'image/png');
+        };
+        img.onerror = () => reject(new Error("فشل تحميل الصورة"));
+        img.src = URL.createObjectURL(file);
+    });
+}
+
+/* ─── استخراج إجمالي القوات من النص (حول X.Xm) للتحقق ─── */
+function extractHeaderTotal(text) {
+    const m = text.match(/(?:حول|around|approximately|about|تقريب[اً]*)\s*(\d+\.?\d*)\s*([kKmM])/i);
+    if (m) return parseNum(m[1] + m[2]);
+    return 0;
+}
+
 /* ─── تنظيف نص كلمة OCR + تصحيح أخطاء شائعة ─── */
 function cleanTroopWord(raw) {
-    let t = (raw || "").trim().replace(/\s/g, '');
+    let t = (raw || "").trim();
+    // إزالة أسطر متعددة: أخذ أطول سطر يحتوي أرقام
+    if (t.includes('\n')) {
+        const lines = t.split('\n').map(l => l.trim()).filter(l => /\d/.test(l));
+        t = lines.sort((a, b) => b.length - a.length)[0] || t.split('\n')[0] || '';
+    }
+    t = t.replace(/\s/g, '');
     // تصحيح أخطاء OCR الشائعة
     t = t.replace(/[oO]/g, '0');
     t = t.replace(/[lI|!]/g, '1');
-    t = t.replace(/,/g, '.');
+    t = t.replace(/[,;:]/g, '.');
+    t = t.replace(/[sS](?=[0-9])/g, '5');
+    t = t.replace(/[bB](?=\d)/g, '8');
     t = t.toLowerCase();
-    // إزالة أحرف غير مطلوبة
+    // إزالة أحرف غير مطلوبة من البداية والنهاية
     t = t.replace(/^[^0-9]+/, '');
     t = t.replace(/[^0-9km.]+$/, '');
-    // مطابقة نمط القوات
+    // إصلاح: نقاط متعددة → نقطة واحدة
+    t = t.replace(/\.{2,}/g, '.');
+    // مطابقة نمط القوات: رقم + k أو m
     const m = t.match(/(\d+\.?\d*[km])/i);
     if (m) return m[1];
-    if (/^0$/.test(t)) return '0';
+    // فقط أصفار
+    if (/^0+$/.test(t)) return '0';
+    // رقم بدون لاحقة (من OCR فردي) → إرجاعه إذا كان رقم صالح
+    const numOnly = t.match(/^(\d+\.?\d*)$/);
+    if (numOnly) {
+        const n = parseFloat(numOnly[1]);
+        if (n === 0) return '0';
+        // لا نعرف إذا k أو m، نرجع null
+    }
     return null;
 }
 
@@ -727,7 +804,7 @@ function consensusVote(allParsed, allData) {
     return result;
 }
 
-/* ============== الدالة الرئيسية لرفع الصورة (3 تمريرات + قص + إجماع) ============== */
+/* ============== الدالة الرئيسية لرفع الصورة (قراءة كل رقم على حدة + مقارنة) ============== */
 async function handleImageUpload(event) {
     const file = event.target.files[0];
     if (!file) return;
@@ -744,79 +821,114 @@ async function handleImageUpload(event) {
             throw new Error("مكتبة OCR لم تُحمَّل. تحقق من اتصال الإنترنت وأعد تحميل الصفحة.");
         }
 
-        // ① إنشاء 3 نسخ بتقنيات مختلفة
+        // ① تجهيز الصور: صورة كاملة + 3 صور لكل رقم على حدة
         if (loadText) loadText.innerText = "🖼️ تحسين الصورة...";
-        const [imgA, imgB, imgC] = await Promise.all([
-            // A: Otsu binarization كاملة 3x → نص أسود على أبيض نظيف
+        const [imgFull, imgL, imgM, imgR] = await Promise.all([
             makeOtsuImage(file, 3),
-            // B: CSS تباين عالي 2x + whitelist → أرقام نظيفة
-            makeFilterImage(file, 2, 'grayscale(100%) contrast(200%)'),
-            // C: Otsu + قص وسط الصورة (15%-70%) → تركيز على منطقة القوات فقط
-            makeOtsuImage(file, 3, 0.15, 0.70)
+            makeNumberImage(file, 4, 0.30, 0.80, 0.00, 0.37),
+            makeNumberImage(file, 4, 0.30, 0.80, 0.30, 0.70),
+            makeNumberImage(file, 4, 0.30, 0.80, 0.63, 1.00)
         ]);
 
-        // ② تشغيل 3 تمريرات OCR بالتوازي
-        if (loadText) loadText.innerText = "🔍 قراءة ثلاثية متوازية...";
-        let progressA = 0, progressC = 0;
-        const updateProgress = () => {
-            if (loadText) loadText.innerText = `🔍 ${Math.round(((progressA + progressC) / 2) * 100)}%`;
+        // ② قراءة OCR: صورة كاملة + 3 أرقام بالتوازي
+        if (loadText) loadText.innerText = "🔍 قراءة القوات...";
+        const numParams = {
+            tessedit_char_whitelist: '0123456789.kKmM ',
+            tessedit_pageseg_mode: '7'
         };
-
-        const [dataA, dataB, dataC] = await Promise.all([
-            // Pass A: بدون whitelist → يقرأ "1.1m" كاملة
-            runOCRPass(imgA, { tessedit_pageseg_mode: '11' }, m => {
-                if (m.status === 'recognizing text') { progressA = m.progress||0; updateProgress(); }
+        const [dataFull, dL, dM, dR] = await Promise.all([
+            runOCRPass(imgFull, { tessedit_pageseg_mode: '11' }, m => {
+                if (m.status === 'recognizing text' && loadText)
+                    loadText.innerText = `🔍 ${Math.round((m.progress||0)*100)}%`;
             }),
-            // Pass B: مع whitelist + تباين عالي → أرقام نظيفة
-            runOCRPass(imgB, {
-                tessedit_char_whitelist: '0123456789.kKmM ',
-                tessedit_pageseg_mode: '11'
-            }, () => {}),
-            // Pass C: صورة مقصوصة بدون whitelist → تركيز على القوات فقط
-            runOCRPass(imgC, { tessedit_pageseg_mode: '11' }, m => {
-                if (m.status === 'recognizing text') { progressC = m.progress||0; updateProgress(); }
-            })
+            runOCRPass(imgL, numParams, ()=>{}),
+            runOCRPass(imgM, numParams, ()=>{}),
+            runOCRPass(imgR, numParams, ()=>{})
         ]);
 
         console.log("═══════════════════════════════════════");
-        console.log("🔍 Pass A (Otsu 3x, no-whitelist):", dataA.text);
-        console.log("🔍 Pass B (contrast 2x, whitelist):", dataB.text);
-        console.log("🔍 Pass C (Otsu cropped, no-whitelist):", dataC.text);
+        console.log("🔍 Full OCR:", dataFull.text.substring(0, 300));
+        console.log("🔍 Left:", dL.text.trim(), "| Center:", dM.text.trim(), "| Right:", dR.text.trim());
         console.log("═══════════════════════════════════════");
 
-        // ③ استخراج القوات من كل نتيجة
-        const parsedA = extractFromData(dataA);
-        const parsedB = extractFromData(dataB);
-        const parsedC = extractFromData(dataC);
+        // ③ استخراج القوات
+        const parsedFull = extractFromData(dataFull);
+        const perNum = {
+            fighter: cleanTroopWord(dL.text) || '0',
+            sniper:  cleanTroopWord(dM.text) || '0',
+            cavalry: cleanTroopWord(dR.text) || '0'
+        };
+        const headerTotal = extractHeaderTotal(dataFull.text);
 
-        console.log("📊 Parsed A:", JSON.stringify(parsedA));
-        console.log("📊 Parsed B:", JSON.stringify(parsedB));
-        console.log("📊 Parsed C:", JSON.stringify(parsedC));
+        console.log("📊 Full:", JSON.stringify(parsedFull));
+        console.log("📊 Per-number:", JSON.stringify(perNum));
+        console.log("📊 Header total:", headerTotal);
 
-        // ④ تصويت بالإجماع: اختيار أفضل قيمة لكل حقل
+        // ④ تقييم ومقارنة النتائج
         if (loadText) loadText.innerText = "🧠 مقارنة النتائج...";
-        let allParsed = [parsedA, parsedB, parsedC];
-        let allData   = [dataA,   dataB,   dataC];
 
-        // ⑤ إذا لم نجد أرقام كافية → تمريرة طوارئ رابعة (PSM 6 على الصورة المقصوصة)
-        const validCount = allParsed.reduce((n, p) => {
-            const v = [p?.fighter, p?.sniper, p?.cavalry].filter(x => isValidTroop(x));
-            return Math.max(n, v.length);
-        }, 0);
-
-        if (validCount < 2) {
-            console.log("⚠️ أرقام غير كافية → تمريرة طوارئ PSM 6...");
-            if (loadText) loadText.innerText = "🔄 محاولة إضافية...";
-            const imgD = await makeOtsuImage(file, 2.5, 0.10, 0.75);
-            const dataD = await runOCRPass(imgD, { tessedit_pageseg_mode: '6' }, () => {});
-            console.log("🔍 Pass D (emergency PSM6):", dataD.text);
-            const parsedD = extractFromData(dataD);
-            console.log("📊 Parsed D:", JSON.stringify(parsedD));
-            allParsed.push(parsedD);
-            allData.push(dataD);
+        function scoreResult(r) {
+            let s = 0;
+            const vals = [r?.fighter||'0', r?.sniper||'0', r?.cavalry||'0'];
+            for (const v of vals) {
+                if (isValidTroop(v)) s += 3;
+                else if (v === '0') s += 1;
+            }
+            if (headerTotal > 0) {
+                const sum = vals.reduce((a, v) => a + parseNum(v), 0);
+                if (sum > 0) {
+                    const ratio = sum / headerTotal;
+                    if (ratio > 0.85 && ratio < 1.15) s += 5;
+                    else if (ratio > 0.7 && ratio < 1.3) s += 2;
+                }
+            }
+            return s;
         }
 
-        const final = consensusVote(allParsed, allData);
+        const sFull = scoreResult(parsedFull);
+        const sPerN = scoreResult(perNum);
+        console.log(`📊 Scores: full=${sFull}, perNum=${sPerN}`);
+
+        // دمج النتائج: اختيار الأفضل لكل حقل
+        let final = {};
+        for (const f of ['fighter','sniper','cavalry']) {
+            const pv = (perNum[f] || '0').toLowerCase();
+            const fv = (parsedFull?.[f] || '0').toLowerCase();
+            if (sPerN > sFull + 2) final[f] = pv;
+            else if (sFull > sPerN + 2) final[f] = fv;
+            else if (isValidTroop(pv) && !isValidTroop(fv)) final[f] = pv;
+            else if (!isValidTroop(pv) && isValidTroop(fv)) final[f] = fv;
+            else if (pv === fv) final[f] = pv;
+            else final[f] = sPerN >= sFull ? pv : fv;
+        }
+
+        // ⑤ طوارئ: إعادة محاولة بقص مختلف إذا لم نجد أرقام كافية
+        let validNow = [final.fighter, final.sniper, final.cavalry]
+            .filter(v => isValidTroop(v)).length;
+
+        if (validNow < 1) {
+            console.log("⚠️ محاولة طوارئ بقص مختلف...");
+            if (loadText) loadText.innerText = "🔄 محاولة إضافية...";
+            const [eL, eM, eR] = await Promise.all([
+                makeNumberImage(file, 5, 0.38, 0.72, 0.00, 0.35),
+                makeNumberImage(file, 5, 0.38, 0.72, 0.33, 0.68),
+                makeNumberImage(file, 5, 0.38, 0.72, 0.65, 1.00)
+            ]);
+            const eP = { tessedit_char_whitelist: '0123456789.kKmM', tessedit_pageseg_mode: '8' };
+            const [edL, edM, edR] = await Promise.all([
+                runOCRPass(eL, eP, ()=>{}),
+                runOCRPass(eM, eP, ()=>{}),
+                runOCRPass(eR, eP, ()=>{})
+            ]);
+            const emergency = {
+                fighter: cleanTroopWord(edL.text) || final.fighter || '0',
+                sniper:  cleanTroopWord(edM.text) || final.sniper || '0',
+                cavalry: cleanTroopWord(edR.text) || final.cavalry || '0'
+            };
+            console.log("📊 Emergency:", JSON.stringify(emergency));
+            if (scoreResult(emergency) > scoreResult(final)) final = emergency;
+        }
+
         console.log("🏆 النتيجة النهائية:", JSON.stringify(final));
 
         const inf = (final.fighter || "0").toLowerCase();
