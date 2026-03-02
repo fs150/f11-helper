@@ -436,7 +436,7 @@ function clearUpload() {
 
 /* ================== قراءة الصورة بـ Tesseract OCR (بدون API key) ================== */
 
-/* --- تحسين الصورة بنسختين مختلفتين لمقارنة النتائج --- */
+/* --- تحسين صورة كاملة --- */
 function makeOCRImage(file, scale, filterStr) {
     return new Promise((resolve, reject) => {
         const img = new Image();
@@ -454,12 +454,32 @@ function makeOCRImage(file, scale, filterStr) {
     });
 }
 
+/* --- قص جزء من الصورة عمودياً (لتركيز OCR على منطقة القوات) --- */
+function makeCroppedOCRImage(file, scale, filterStr, topPct, bottomPct) {
+    return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => {
+            const srcY = Math.floor(img.height * topPct);
+            const srcH = Math.floor(img.height * (bottomPct - topPct));
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            canvas.width  = img.width * scale;
+            canvas.height = srcH * scale;
+            ctx.filter = filterStr;
+            ctx.drawImage(img, 0, srcY, img.width, srcH, 0, 0, canvas.width, canvas.height);
+            canvas.toBlob(blob => { resolve(blob); URL.revokeObjectURL(img.src); }, 'image/png');
+        };
+        img.onerror = () => reject(new Error("فشل تحميل الصورة"));
+        img.src = URL.createObjectURL(file);
+    });
+}
+
 /* --- تنظيف نص كلمة OCR لاستخراج رقم القوات --- */
 function cleanTroopWord(raw) {
     let t = (raw || "").trim().toLowerCase().replace(/\s/g, '');
     // إزالة أحرف غير مطلوبة من البداية والنهاية
-    t = t.replace(/^[^0-9]+/, ''); // أحرف قبل الرقم
-    t = t.replace(/[^0-9km]+$/, ''); // أحرف بعد k/m
+    t = t.replace(/^[^0-9]+/, '');
+    t = t.replace(/[^0-9km]+$/, '');
     // محاولة مطابقة نمط القوات
     const m = t.match(/(\d+\.?\d*[km])/i);
     if (m) return m[1];
@@ -469,10 +489,9 @@ function cleanTroopWord(raw) {
 
 /* --- استخراج ذكي: باستخدام مواقع الكلمات (bbox) للعثور على 3 أرقام على نفس الصف --- */
 function extractTroopsFromWords(words, imgHeight) {
-    // تصفية الكلمات التي تشبه أرقام قوات (مع تنظيف)
     const troopWords = [];
     for (const w of (words || [])) {
-        if ((w.confidence || 0) < 20) continue;
+        if ((w.confidence || 0) < 15) continue;
         const cleaned = cleanTroopWord(w.text);
         if (cleaned) {
             troopWords.push({ ...w, cleanVal: cleaned });
@@ -481,10 +500,8 @@ function extractTroopsFromWords(words, imgHeight) {
 
     if (troopWords.length < 2) return null;
 
-    // ترتيب بحسب الموقع العمودي (من أعلى لأسفل)
     troopWords.sort((a, b) => a.bbox.y0 - b.bbox.y0);
 
-    // تجميع الكلمات في صفوف (كلمات بنفس الارتفاع تقريباً = صف واحد)
     const yTol = Math.max(40, imgHeight * 0.04);
     const rows = [];
     let currentRow = [troopWords[0]];
@@ -498,11 +515,11 @@ function extractTroopsFromWords(words, imgHeight) {
     }
     rows.push(currentRow);
 
-    console.log("🔍 صفوف الأرقام:", rows.map(r => r.map(w => w.cleanVal + '(' + Math.round(w.confidence) + ')')));
+    console.log("🔍 صفوف:", rows.map(r => r.map(w => w.cleanVal + '(' + Math.round(w.confidence) + ')')));
 
-    // 🏆 الأفضل: صف يحتوي 3 أرقام بالضبط
+    // 🏆 صف بـ 3 أرقام
     let best = rows.find(r => r.length === 3);
-    // أو: أول صف بـ 2 رقم (الثالث = 0)
+    // أو: صف بـ 2 رقم (الثالث = 0)
     if (!best) best = rows.find(r => r.length === 2);
     if (!best) return null;
 
@@ -511,15 +528,17 @@ function extractTroopsFromWords(words, imgHeight) {
     const vals = best.map(w => w.cleanVal);
     while (vals.length < 3) vals.push('0');
 
-    return { fighter: vals[0], sniper: vals[1], cavalry: vals[2] };
+    return {
+        fighter: vals[0], sniper: vals[1], cavalry: vals[2],
+        words: best // نحفظ الكلمات الأصلية للثقة
+    };
 }
 
-/* --- استخراج احتياطي من النص (إذا فشل bbox) --- */
+/* --- استخراج احتياطي من النص الخام --- */
 function extractTroopsFromText(rawText) {
     const text = rawText.toLowerCase().trim();
     const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
 
-    // تجاهل أسطر الإجمالي (حول X.Xm / about / إجمالي / total)
     function isSummaryLine(line) {
         return /حول|about|إجمالي|total|around|تقريب/i.test(line);
     }
@@ -538,12 +557,10 @@ function extractTroopsFromText(rawText) {
     const filteredLines = lines.filter(l => !isSummaryLine(l));
 
     let c = [];
-    // سطر بـ 3 أرقام
     for (const line of filteredLines) {
         const nums = numsFromLine(line);
         if (nums.length === 3) { c = nums; break; }
     }
-    // سطر بـ 2 رقم k/m
     if (c.length < 3) {
         for (const line of filteredLines) {
             const nums = numsFromLine(line);
@@ -552,7 +569,6 @@ function extractTroopsFromText(rawText) {
             }
         }
     }
-    // جمع مع تجاهل أرقام m وحيدة (إجمالي)
     if (c.length < 3) {
         c = [];
         for (const line of filteredLines) {
@@ -565,7 +581,7 @@ function extractTroopsFromText(rawText) {
     return { fighter: c[0]||"0", sniper: c[1]||"0", cavalry: c[2]||"0" };
 }
 
-/* --- تشغيل OCR مرة واحدة على صورة معيّنة --- */
+/* --- تشغيل OCR مرة واحدة --- */
 async function runOCRPass(blob, params, logger) {
     const worker = await Tesseract.createWorker('eng', 1, { logger });
     if (params) await worker.setParameters(params);
@@ -574,18 +590,85 @@ async function runOCRPass(blob, params, logger) {
     return data;
 }
 
-/* --- عدّ القيم الصالحة (غير صفرية) في نتيجة القوات --- */
-function countValidTroops(parsed) {
-    if (!parsed) return 0;
-    const isNonZero = v => /^\d+\.?\d*[km]$/i.test((v||"").toLowerCase());
-    let count = 0;
-    if (isNonZero(parsed.fighter)) count++;
-    if (isNonZero(parsed.sniper))  count++;
-    if (isNonZero(parsed.cavalry)) count++;
-    return count;
+/* --- استخراج القوات من نتيجة OCR --- */
+function extractFromData(data) {
+    const imgH = (data.words||[]).reduce((max, w) => Math.max(max, w.bbox.y1||0), 1);
+    return extractTroopsFromWords(data.words, imgH)
+        || extractTroopsFromText(data.text || "");
 }
 
-/* --- الدالة الرئيسية لرفع الصورة --- */
+/* --- هل القيمة رقم قوات صالح (غير صفري)؟ --- */
+function isValidTroop(v) {
+    return /^\d+\.?\d*[km]$/i.test((v||"").toLowerCase());
+}
+
+/* --- تصويت بالإجماع: اختيار أفضل قيمة لكل حقل من عدة نتائج --- */
+function consensusVote(allParsed, allData) {
+    const fields = ['fighter', 'sniper', 'cavalry'];
+    const result = {};
+
+    for (const field of fields) {
+        const candidates = [];
+
+        for (let i = 0; i < allParsed.length; i++) {
+            const val = (allParsed[i]?.[field] || "0").toLowerCase();
+            if (!isValidTroop(val)) continue;
+
+            // حساب الثقة من كلمات OCR
+            let conf = 50;
+            const savedWords = allParsed[i]?.words;
+            if (savedWords) {
+                const matched = savedWords.find(w => w.cleanVal === val);
+                if (matched) conf = matched.confidence || 50;
+            }
+            if (!savedWords && allData[i]) {
+                const matched = (allData[i].words||[]).find(w => cleanTroopWord(w.text) === val);
+                if (matched) conf = matched.confidence || 50;
+            }
+
+            candidates.push({ val, conf, pass: i });
+        }
+
+        if (candidates.length === 0) {
+            result[field] = "0";
+            continue;
+        }
+
+        if (candidates.length === 1) {
+            result[field] = candidates[0].val;
+            continue;
+        }
+
+        // عدّ التكرارات: إذا 2+ تمريرات اتفقت → إجماع
+        const counts = {};
+        for (const c of candidates) {
+            counts[c.val] = (counts[c.val] || 0) + 1;
+        }
+
+        let majority = null;
+        let majorityCount = 0;
+        for (const [val, count] of Object.entries(counts)) {
+            if (count > majorityCount) {
+                majority = val;
+                majorityCount = count;
+            }
+        }
+
+        if (majorityCount >= 2) {
+            result[field] = majority;
+            console.log(`  ✅ ${field}: "${majority}" (إجماع ${majorityCount}/${candidates.length})`);
+        } else {
+            // لا إجماع → أعلى ثقة
+            candidates.sort((a, b) => b.conf - a.conf);
+            result[field] = candidates[0].val;
+            console.log(`  ⚖️ ${field}: "${candidates[0].val}" (أعلى ثقة ${Math.round(candidates[0].conf)}) من ${candidates.map(c=>'"'+c.val+'"').join(' vs ')}`);
+        }
+    }
+
+    return result;
+}
+
+/* ============== الدالة الرئيسية لرفع الصورة (3 تمريرات + قص + إجماع) ============== */
 async function handleImageUpload(event) {
     const file = event.target.files[0];
     if (!file) return;
@@ -602,97 +685,76 @@ async function handleImageUpload(event) {
             throw new Error("مكتبة OCR لم تُحمَّل. تحقق من اتصال الإنترنت وأعد تحميل الصفحة.");
         }
 
-        // ① إعداد: صورة أصلية (بدون فلتر) + صورة محسّنة
+        // ① إنشاء 3 نسخ بإعدادات مختلفة
         if (loadText) loadText.innerText = "🖼️ تحسين الصورة...";
-        const [imgA, imgB] = await Promise.all([
+        const [imgA, imgB, imgC] = await Promise.all([
+            // A: صورة كاملة، 2x، رمادي فقط (بدون whitelist → يقرأ 1.1m ككلمة)
             makeOCRImage(file, 2, 'grayscale(100%)'),
-            makeOCRImage(file, 2, 'grayscale(100%) contrast(180%)')
+            // B: صورة كاملة، 2x، تباين عالي + whitelist (أرقام نظيفة)
+            makeOCRImage(file, 2, 'grayscale(100%) contrast(200%)'),
+            // C: قص وسط الصورة (15%-70%) + تباين متوسط (تركيز على منطقة القوات)
+            makeCroppedOCRImage(file, 2, 'grayscale(100%) contrast(150%)', 0.15, 0.70)
         ]);
 
-        // ② تشغيل OCR مرتين بالتوازي بإعدادات مختلفة
-        // Pass A: بدون whitelist → يقرأ "1.1m" ككلمة واحدة
-        // Pass B: مع whitelist → أرقام أنظف لكن قد يفصل الأرقام العشرية
-        if (loadText) loadText.innerText = "🔍 قراءة مزدوجة...";
-        const logger = m => {
-            if (m.status === 'recognizing text' && loadText) {
-                loadText.innerText = `🔍 ${Math.round((m.progress || 0) * 100)}%`;
-            }
+        // ② تشغيل 3 تمريرات OCR بالتوازي
+        if (loadText) loadText.innerText = "🔍 قراءة ثلاثية متوازية...";
+        let progressA = 0, progressC = 0;
+        const updateProgress = () => {
+            if (loadText) loadText.innerText = `🔍 ${Math.round(((progressA + progressC) / 2) * 100)}%`;
         };
 
-        const [dataA, dataB] = await Promise.all([
-            runOCRPass(imgA, { tessedit_pageseg_mode: '11' }, logger),
-            runOCRPass(imgB, { tessedit_char_whitelist: '0123456789.kKmM ', tessedit_pageseg_mode: '11' }, () => {})
+        const [dataA, dataB, dataC] = await Promise.all([
+            // Pass A: بدون whitelist → يقرأ "1.1m" كاملة
+            runOCRPass(imgA, { tessedit_pageseg_mode: '11' }, m => {
+                if (m.status === 'recognizing text') { progressA = m.progress||0; updateProgress(); }
+            }),
+            // Pass B: مع whitelist + تباين عالي → أرقام نظيفة
+            runOCRPass(imgB, {
+                tessedit_char_whitelist: '0123456789.kKmM ',
+                tessedit_pageseg_mode: '11'
+            }, () => {}),
+            // Pass C: صورة مقصوصة بدون whitelist → تركيز على القوات فقط
+            runOCRPass(imgC, { tessedit_pageseg_mode: '11' }, m => {
+                if (m.status === 'recognizing text') { progressC = m.progress||0; updateProgress(); }
+            })
         ]);
 
-        console.log("🔍 Pass A (no whitelist):", dataA.text);
-        console.log("🔍 Pass B (whitelist):", dataB.text);
+        console.log("═══════════════════════════════════════");
+        console.log("🔍 Pass A (full, no-whitelist):", dataA.text);
+        console.log("🔍 Pass B (full, whitelist):", dataB.text);
+        console.log("🔍 Pass C (cropped, no-whitelist):", dataC.text);
+        console.log("═══════════════════════════════════════");
 
-        // ③ استخراج الأرقام من كل نتيجة بـ bbox ثم نص
-        function extract(data) {
-            const imgH = (data.words||[]).reduce((max, w) => Math.max(max, w.bbox.y1||0), 1);
-            return extractTroopsFromWords(data.words, imgH)
-                || extractTroopsFromText(data.text || "");
-        }
+        // ③ استخراج القوات من كل نتيجة
+        const parsedA = extractFromData(dataA);
+        const parsedB = extractFromData(dataB);
+        const parsedC = extractFromData(dataC);
 
-        const parsedA = extract(dataA);
-        const parsedB = extract(dataB);
+        console.log("📊 Parsed A:", JSON.stringify(parsedA));
+        console.log("📊 Parsed B:", JSON.stringify(parsedB));
+        console.log("📊 Parsed C:", JSON.stringify(parsedC));
 
-        console.log("🔍 Parsed A:", parsedA);
-        console.log("🔍 Parsed B:", parsedB);
+        // ④ تصويت بالإجماع: اختيار أفضل قيمة لكل حقل
+        if (loadText) loadText.innerText = "🧠 مقارنة النتائج...";
+        const final = consensusVote(
+            [parsedA, parsedB, parsedC],
+            [dataA,   dataB,   dataC]
+        );
 
-        // ④ دمج: اختيار النتيجة التي وجدت أكثر قوات صالحة (غير صفرية)
-        const countA = countValidTroops(parsedA);
-        const countB = countValidTroops(parsedB);
-        console.log(`🔍 Valid troops: A=${countA}, B=${countB}`);
+        console.log("🏆 النتيجة النهائية:", JSON.stringify(final));
 
-        let best;
-        if (countA > countB) {
-            best = parsedA;
-            console.log("✅ اختيار Pass A (أكثر قوات)");
-        } else if (countB > countA) {
-            best = parsedB;
-            console.log("✅ اختيار Pass B (أكثر قوات)");
-        } else {
-            // نفس العدد → دمج حقل بحقل: اختيار القيمة غير الصفرية أو الأعلى ثقة
-            function wordConf(data, val) {
-                return (data.words||[]).find(w =>
-                    w.text.trim().toLowerCase().replace(/\s/g,'') === val
-                )?.confidence || 0;
-            }
-            function pickField(vA, vB) {
-                vA = (vA || "0").toLowerCase();
-                vB = (vB || "0").toLowerCase();
-                if (vA === vB) return vA;
-                const isValidA = /^\d+\.?\d*[km]$/i.test(vA);
-                const isValidB = /^\d+\.?\d*[km]$/i.test(vB);
-                if (isValidA && !isValidB) return vA;
-                if (isValidB && !isValidA) return vB;
-                // كلاهما صالح → الأعلى ثقة
-                const cA = wordConf(dataA, vA);
-                const cB = wordConf(dataB, vB);
-                console.log(`  ⚖️ "${vA}"(${Math.round(cA)}) vs "${vB}"(${Math.round(cB)})`);
-                return cA >= cB ? vA : vB;
-            }
-            best = {
-                fighter: pickField(parsedA?.fighter, parsedB?.fighter),
-                sniper:  pickField(parsedA?.sniper,  parsedB?.sniper),
-                cavalry: pickField(parsedA?.cavalry, parsedB?.cavalry)
-            };
-            console.log("✅ دمج حقل بحقل:", best);
-        }
+        const inf = (final.fighter || "0").toLowerCase();
+        const sni = (final.sniper  || "0").toLowerCase();
+        const cav = (final.cavalry || "0").toLowerCase();
 
-        const inf = (best?.fighter || "0").toLowerCase();
-        const sni = (best?.sniper  || "0").toLowerCase();
-        const cav = (best?.cavalry || "0").toLowerCase();
-
-        const isValid = v => /^\d+\.?\d*[km]$|^0$/.test(v);
-        if (![inf, sni, cav].some(isValid)) {
+        const isOK = v => /^\d+\.?\d*[km]$|^0$/.test(v);
+        if (![inf, sni, cav].some(isOK)) {
             throw new Error("لم يتمكن OCR من قراءة أرقام القوات. جرب صورة أوضح أو أدخل يدوياً.");
         }
 
-        document.getElementById("enInf").value = isValid(inf) ? inf : "0";
-        document.getElementById("enSni").value = isValid(sni) ? sni : "0";
-        document.getElementById("enCav").value = isValid(cav) ? cav : "0";
+        document.getElementById("enInf").value = isOK(inf) ? inf : "0";
+        document.getElementById("enSni").value = isOK(sni) ? sni : "0";
+        document.getElementById("enCav").value = isOK(cav) ? cav : "0";
 
         toast(`✅ ${inf} · ${sni} · ${cav}`);
         setTimeout(() => smartAnalyze(), 400);
