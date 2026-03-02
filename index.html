@@ -436,69 +436,142 @@ function clearUpload() {
 
 /* ================== قراءة الصورة بـ Tesseract OCR (بدون API key) ================== */
 
-// استخراج أرقام القوات من نص OCR
-function extractTroopsFromOCR(rawText) {
-    // تنظيف النص وتصحيح أخطاء OCR الشائعة
-    let text = rawText
-        .replace(/[Oo]/g, '0')   // حرف O يُقرأ كـ 0
-        .replace(/[Il|]/g, '1')  // حرف I/l يُقرأ كـ 1
-        .replace(/[Ss]/g, (m, i, str) => {
-            // S بعد رقم = 5 (مثل: 94S.0k → 945.0k)
-            return (i > 0 && /\d/.test(str[i-1])) ? '5' : m;
-        })
-        .toLowerCase();
-
-    const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
-
-    // نمط الأرقام: 945.0k أو 1.1m أو 640k أو أعداد كبيرة مجردة
-    const numPat = /(\d+\.?\d*)\s*([km])\b/g;
-
-    // البحث عن سطر يحتوي "total forces" أو "إجمالي القوات"
-    const totalIdx = lines.findIndex(l =>
-        /total[\s.]*force/i.test(l) ||
-        /total[\s.]*troop/i.test(l) ||
-        /all[\s.]*force/i.test(l) ||
-        /إجمالي/.test(l)
-    );
-
-    // جمع المرشحين من المنطقة القريبة من "Total Forces"
-    let candidates = [];
-    const start = totalIdx >= 0 ? totalIdx : 0;
-    const end   = Math.min(start + 12, lines.length);
-
-    for (let i = start; i < end; i++) {
-        const matches = [...lines[i].matchAll(numPat)];
-        if (matches.length === 3) {
-            // وجدنا سطراً بثلاثة أرقام بالضبط — هذا هو الصف المطلوب
-            candidates = matches.map(m => m[1] + m[2]);
-            break;
-        }
-        if (matches.length > 0 && candidates.length < 3) {
-            matches.forEach(m => candidates.push(m[1] + m[2]));
-        }
-        if (candidates.length >= 3) break;
-    }
-
-    // احتياطي: ابحث في كل النص إذا لم نجد 3 أرقام
-    if (candidates.length < 3) {
-        candidates = [];
-        const allMatches = [...text.matchAll(numPat)];
-        // تجاهل الأرقام المكررة (أرقام تفصيلية للمستويات)
-        const seen = new Set();
-        for (const m of allMatches) {
-            const val = m[1] + m[2];
-            if (!seen.has(val)) { seen.add(val); candidates.push(val); }
-            if (candidates.length >= 3) break;
-        }
-    }
-
-    return {
-        fighter: candidates[0] || "0",
-        sniper:  candidates[1] || "0",
-        cavalry: candidates[2] || "0"
-    };
+/* --- تحسين الصورة بنسختين مختلفتين لمقارنة النتائج --- */
+function makeOCRImage(file, scale, filterStr) {
+    return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => {
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            canvas.width  = img.width * scale;
+            canvas.height = img.height * scale;
+            ctx.filter = filterStr;
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+            canvas.toBlob(blob => { resolve(blob); URL.revokeObjectURL(img.src); }, 'image/png');
+        };
+        img.onerror = () => reject(new Error("فشل تحميل الصورة"));
+        img.src = URL.createObjectURL(file);
+    });
 }
 
+/* --- استخراج ذكي: باستخدام مواقع الكلمات (bbox) للعثور على 3 أرقام على نفس الصف --- */
+function extractTroopsFromWords(words, imgHeight) {
+    const troopPat = /^\d+\.?\d*[km]$/i;
+    // تصفية الكلمات التي تشبه أرقام قوات
+    const troopWords = (words || []).filter(w => {
+        const t = (w.text || "").trim().toLowerCase().replace(/\s/g, '');
+        return (troopPat.test(t) || t === '0') && w.confidence > 30;
+    });
+
+    if (troopWords.length < 2) return null;
+
+    // ترتيب بحسب الموقع العمودي (من أعلى لأسفل)
+    troopWords.sort((a, b) => a.bbox.y0 - b.bbox.y0);
+
+    // تجميع الكلمات في صفوف (كلمات بنفس الارتفاع تقريباً = صف واحد)
+    const yTol = Math.max(40, imgHeight * 0.04);
+    const rows = [];
+    let currentRow = [troopWords[0]];
+    for (let i = 1; i < troopWords.length; i++) {
+        if (Math.abs(troopWords[i].bbox.y0 - currentRow[0].bbox.y0) < yTol) {
+            currentRow.push(troopWords[i]);
+        } else {
+            rows.push(currentRow);
+            currentRow = [troopWords[i]];
+        }
+    }
+    rows.push(currentRow);
+
+    console.log("🔍 صفوف الأرقام:", rows.map(r => r.map(w => w.text + '(' + Math.round(w.confidence) + ')')));
+
+    // 🏆 الأفضل: صف يحتوي 3 أرقام بالضبط
+    let best = rows.find(r => r.length === 3);
+    // أو: أول صف بـ 2 رقم (الثالث = 0)
+    if (!best) best = rows.find(r => r.length === 2);
+    if (!best) return null;
+
+    // ترتيب من يسار لليمين = مقاتل ← قناص ← جوال
+    best.sort((a, b) => a.bbox.x0 - b.bbox.x0);
+    const vals = best.map(w => w.text.trim().toLowerCase().replace(/\s/g, ''));
+    while (vals.length < 3) vals.push('0');
+
+    return { fighter: vals[0], sniper: vals[1], cavalry: vals[2] };
+}
+
+/* --- استخراج احتياطي من النص (إذا فشل bbox) --- */
+function extractTroopsFromText(rawText) {
+    const text = rawText.toLowerCase().trim();
+    const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+
+    function numsFromLine(line) {
+        const result = [];
+        const pat = /(\d+\.?\d*\s*[km])|\b(0)\b/g;
+        let m;
+        while ((m = pat.exec(line)) !== null) {
+            if (m[1]) result.push(m[1].replace(/\s/g, ''));
+            else result.push('0');
+        }
+        return result;
+    }
+
+    let c = [];
+    // سطر بـ 3 أرقام
+    for (const line of lines) {
+        const nums = numsFromLine(line);
+        if (nums.length === 3) { c = nums; break; }
+    }
+    // سطر بـ 2 رقم k/m
+    if (c.length < 3) {
+        for (const line of lines) {
+            const nums = numsFromLine(line);
+            if (nums.length === 2 && nums.every(n => /[km]$/.test(n))) {
+                c = [...nums, "0"]; break;
+            }
+        }
+    }
+    // جمع مع تجاهل أرقام m وحيدة (إجمالي)
+    if (c.length < 3) {
+        c = [];
+        for (const line of lines) {
+            const nums = numsFromLine(line);
+            if (nums.length === 1 && /^\d+\.?\d*m$/.test(nums[0])) continue;
+            for (const n of nums) { c.push(n); if (c.length >= 3) break; }
+            if (c.length >= 3) break;
+        }
+    }
+    return { fighter: c[0]||"0", sniper: c[1]||"0", cavalry: c[2]||"0" };
+}
+
+/* --- تشغيل OCR مرة واحدة على صورة معيّنة --- */
+async function runOCRPass(blob, logger) {
+    const worker = await Tesseract.createWorker('eng', 1, { logger });
+    await worker.setParameters({
+        tessedit_char_whitelist: '0123456789.kKmM ',
+        tessedit_pageseg_mode: '11'
+    });
+    const { data } = await worker.recognize(blob);
+    await worker.terminate();
+    return data;
+}
+
+/* --- مقارنة نتيجتين واختيار الأفضل (أعلى ثقة) --- */
+function pickBestResult(result1, result2) {
+    if (!result1 && !result2) return null;
+    if (!result1) return result2;
+    if (!result2) return result1;
+
+    // حساب مجموع الثقة لكل نتيجة
+    function totalConf(data) {
+        return (data.words || []).reduce((sum, w) => sum + (w.confidence || 0), 0);
+    }
+
+    const conf1 = totalConf(result1);
+    const conf2 = totalConf(result2);
+    console.log(`🔍 Pass1 conf=${Math.round(conf1)}, Pass2 conf=${Math.round(conf2)}`);
+    return conf1 >= conf2 ? result1 : result2;
+}
+
+/* --- الدالة الرئيسية لرفع الصورة --- */
 async function handleImageUpload(event) {
     const file = event.target.files[0];
     if (!file) return;
@@ -506,54 +579,79 @@ async function handleImageUpload(event) {
     showUploadPreview(file);
     document.getElementById("out").classList.remove("error");
 
-    const overlay = document.getElementById("loadingOverlay");
-    const loadingText = document.getElementById("loadingText");
+    const overlay  = document.getElementById("loadingOverlay");
+    const loadText = document.getElementById("loadingText");
     overlay.style.display = "flex";
-    if (loadingText) loadingText.innerText = "🔍 جاري قراءة الأرقام...";
 
     try {
-        // تأكد أن Tesseract محمّل
         if (typeof Tesseract === "undefined") {
             throw new Error("مكتبة OCR لم تُحمَّل. تحقق من اتصال الإنترنت وأعد تحميل الصفحة.");
         }
 
-        // تشغيل OCR
-        const result = await Tesseract.recognize(file, 'eng', {
-            logger: m => {
-                if (m.status === 'recognizing text' && loadingText) {
-                    const pct = Math.round((m.progress || 0) * 100);
-                    loadingText.innerText = `🔍 ${pct}%`;
-                }
+        // ① إعداد نسختين بإعدادات مختلفة
+        if (loadText) loadText.innerText = "🖼️ تحسين الصورة...";
+        const [imgA, imgB] = await Promise.all([
+            makeOCRImage(file, 2, 'grayscale(100%) contrast(180%)'),
+            makeOCRImage(file, 3, 'grayscale(100%) contrast(130%)')
+        ]);
+
+        // ② تشغيل OCR مرتين بالتوازي
+        if (loadText) loadText.innerText = "🔍 قراءة مزدوجة...";
+        const logger = m => {
+            if (m.status === 'recognizing text' && loadText) {
+                loadText.innerText = `🔍 ${Math.round((m.progress || 0) * 100)}%`;
             }
-        });
+        };
 
-        const rawText = result.data.text || "";
-        console.log("🔍 OCR نص كامل:\n", rawText);
+        const [dataA, dataB] = await Promise.all([
+            runOCRPass(imgA, logger),
+            runOCRPass(imgB, () => {})
+        ]);
 
-        const parsed = extractTroopsFromOCR(rawText);
+        console.log("🔍 Pass1 (2x,contrast180):", dataA.text);
+        console.log("🔍 Pass2 (3x,contrast130):", dataB.text);
 
-        // تطبيع وتحقق
-        const norm = v => (v || "0").toString().toLowerCase().trim().replace(/,/g, "").replace(/\s/g, "");
-        const isValid = v => /^\d+\.?\d*[km]$|^\d{4,}$|^0$/.test(v);
-
-        const inf = norm(parsed.fighter);
-        const sni = norm(parsed.sniper);
-        const cav = norm(parsed.cavalry);
-
-        const validCount = [inf, sni, cav].filter(isValid).length;
-        if (validCount === 0) {
-            throw new Error("لم يتمكن OCR من قراءة أرقام القوات. جرب صورة أوضح.");
+        // ③ استخراج الأرقام من كل نتيجة بـ bbox
+        function extract(data) {
+            const imgH = (data.words||[]).reduce((max, w) => Math.max(max, w.bbox.y1||0), 1);
+            return extractTroopsFromWords(data.words, imgH)
+                || extractTroopsFromText(data.text || "");
         }
 
-        const safeInf = isValid(inf) ? inf : "0";
-        const safeSni = isValid(sni) ? sni : "0";
-        const safeCav = isValid(cav) ? cav : "0";
+        const parsedA = extract(dataA);
+        const parsedB = extract(dataB);
 
-        document.getElementById("enInf").value = safeInf;
-        document.getElementById("enSni").value = safeSni;
-        document.getElementById("enCav").value = safeCav;
+        // ④ دمج: اختيار أفضل قيمة لكل حقل (الأعلى ثقة بين المرتين)
+        function wordConf(data, val) {
+            return (data.words||[]).find(w =>
+                w.text.trim().toLowerCase().replace(/\s/g,'') === val
+            )?.confidence || 0;
+        }
 
-        toast(`✅ ${safeInf} · ${safeSni} · ${safeCav}`);
+        function pickVal(keyA, keyB, dA, dB) {
+            const vA = (keyA || "0").toLowerCase();
+            const vB = (keyB || "0").toLowerCase();
+            if (vA === vB) return vA;
+            const cA = wordConf(dA, vA);
+            const cB = wordConf(dB, vB);
+            console.log(`  ⚖️ "${vA}"(${Math.round(cA)}) vs "${vB}"(${Math.round(cB)})`);
+            return cA >= cB ? vA : vB;
+        }
+
+        const inf = pickVal(parsedA?.fighter, parsedB?.fighter, dataA, dataB);
+        const sni = pickVal(parsedA?.sniper,  parsedB?.sniper,  dataA, dataB);
+        const cav = pickVal(parsedA?.cavalry, parsedB?.cavalry, dataA, dataB);
+
+        const isValid = v => /^\d+\.?\d*[km]$|^0$/.test(v);
+        if (![inf, sni, cav].some(isValid)) {
+            throw new Error("لم يتمكن OCR من قراءة أرقام القوات. جرب صورة أوضح أو أدخل يدوياً.");
+        }
+
+        document.getElementById("enInf").value = isValid(inf) ? inf : "0";
+        document.getElementById("enSni").value = isValid(sni) ? sni : "0";
+        document.getElementById("enCav").value = isValid(cav) ? cav : "0";
+
+        toast(`✅ ${inf} · ${sni} · ${cav}`);
         setTimeout(() => smartAnalyze(), 400);
 
     } catch(err) {
