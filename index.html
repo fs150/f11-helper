@@ -245,6 +245,74 @@
   .smartWhyText ul { margin: 8px 0; padding-inline-start: 24px; }
   .smartWhyText li { margin-bottom: 6px; }
 
+  /* ===== شريط الإعلان المتحرك ===== */
+  .news-ticker {
+    width: 100%;
+    overflow: hidden;
+    background: linear-gradient(90deg, #92400e, #d97706, #f59e0b, #d97706, #92400e);
+    background-size: 300% 100%;
+    animation: tickerBg 6s linear infinite;
+    border-radius: 14px;
+    margin-bottom: 18px;
+    position: relative;
+    z-index: 4;
+    box-shadow: 0 4px 18px var(--primary-glow), 0 2px 8px rgba(0,0,0,0.12);
+    border: 1px solid rgba(255,255,255,0.12);
+    display: flex;
+    align-items: stretch;
+    min-height: 40px;
+  }
+  .news-ticker-badge {
+    flex-shrink: 0;
+    padding: 0 14px;
+    font-size: 12px;
+    font-weight: 900;
+    color: #fff;
+    background: rgba(0,0,0,0.28);
+    display: flex;
+    align-items: center;
+    border-inline-end: 1.5px solid rgba(255,255,255,0.22);
+    white-space: nowrap;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    gap: 5px;
+  }
+  .news-ticker-track {
+    flex: 1;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    padding: 9px 0;
+  }
+  .news-ticker-inner {
+    display: inline-flex;
+    white-space: nowrap;
+    animation: tickerScroll 32s linear infinite;
+    direction: ltr;
+  }
+  .news-ticker-inner:hover { animation-play-state: paused; cursor: default; }
+  .news-ticker-text {
+    font-size: 13.5px;
+    font-weight: 800;
+    color: #fff;
+    padding: 0 70px;
+    letter-spacing: 0.3px;
+    text-shadow: 0 1px 6px rgba(0,0,0,0.35);
+  }
+  @keyframes tickerScroll {
+    0%   { transform: translateX(80vw); }
+    100% { transform: translateX(-100%); }
+  }
+  @keyframes tickerBg {
+    0%   { background-position: 0% 50%; }
+    100% { background-position: 300% 50%; }
+  }
+  .dark .news-ticker {
+    background: linear-gradient(90deg, #451a03, #92400e, #f59e0b, #92400e, #451a03);
+    background-size: 300% 100%;
+    box-shadow: 0 4px 22px rgba(245,158,11,0.35);
+  }
+
 </style>
 </head>
 
@@ -272,6 +340,18 @@
 
 <div class="muted" id="hint">
   اكتب مثل: <span class="pill">360k</span> <span class="pill">1.1m</span>
+</div>
+
+<!-- ===== شريط الإعلان المتحرك ===== -->
+<div class="news-ticker" id="newsTicker">
+  <div class="news-ticker-badge" id="tickerBadge">📢 جديد</div>
+  <div class="news-ticker-track">
+    <div class="news-ticker-inner">
+      <span class="news-ticker-text" id="tickerText1">🚧 إضافة الصور قيد التطوير — سيتم رفع مستوى الذكاء الاصطناعي في أقرب وقت ممكن ✨</span>
+      <span class="news-ticker-text" id="tickerText2">🚧 إضافة الصور قيد التطوير — سيتم رفع مستوى الذكاء الاصطناعي في أقرب وقت ممكن ✨</span>
+      <span class="news-ticker-text" id="tickerText3">🚧 إضافة الصور قيد التطوير — سيتم رفع مستوى الذكاء الاصطناعي في أقرب وقت ممكن ✨</span>
+    </div>
+  </div>
 </div>
 
 <div class="box">
@@ -1011,7 +1091,9 @@ const T = {
     uploadLblCamera: "التقاط صورة",  uploadSubCamera: "افتح الكاميرا",
     uploadLblFile: "اختيار ملف",     uploadSubFile: "من الجهاز",
     loadingText: "🤖 جاري تحليل التقرير بدقة...",
-    ocrFail: "الرجاء التأكد أن الصورة لتقرير الاستطلاع، وتكون الأرقام واضحة."
+    ocrFail: "الرجاء التأكد أن الصورة لتقرير الاستطلاع، وتكون الأرقام واضحة.",
+    tickerBadge: "📢 جديد",
+    tickerMsg: "🚧 إضافة الصور قيد التطوير — سيتم رفع مستوى الذكاء الاصطناعي في أقرب وقت ممكن ✨"
   },
   en: {
     title: "<span class='daly-text'>Daly</span><span class='alpha-badge'>ALPHA</span>",
@@ -1066,7 +1148,9 @@ const T = {
     uploadLblCamera: "Camera",         uploadSubCamera: "Take a photo",
     uploadLblFile: "Browse File",      uploadSubFile: "From device",
     loadingText: "🤖 Analyzing screenshot accurately...",
-    ocrFail: "Please ensure the image is a clear scout report."
+    ocrFail: "Please ensure the image is a clear scout report.",
+    tickerBadge: "📢 NEWS",
+    tickerMsg: "🚧 AI image upload is under development — Enhanced AI coming very soon ✨"
   },
   pt: {
     title: "<span class='daly-text'>Daly</span><span class='alpha-badge'>ALPHA</span>",
@@ -1121,7 +1205,9 @@ const T = {
     uploadLblCamera: "Câmera",         uploadSubCamera: "Tirar foto",
     uploadLblFile: "Arquivo",          uploadSubFile: "Do dispositivo",
     loadingText: "🤖 Analisando imagem...",
-    ocrFail: "Certifique-se de que a imagem é um relatório de exploração claro."
+    ocrFail: "Certifique-se de que a imagem é um relatório de exploração claro.",
+    tickerBadge: "📢 NOVIDADE",
+    tickerMsg: "🚧 Envio de imagens com IA em desenvolvimento — IA aprimorada chegando em breve ✨"
   }
 };
 
@@ -1167,6 +1253,13 @@ function setLang(lang) {
   document.getElementById("ratioHint").innerText = t.ratioHint;
   document.getElementById("legendTitle").innerText = t.legendTitle;
   document.getElementById("sig").innerHTML = `${t.sig} <span>F11</span>`;
+  // تحديث نص الشريط المتحرك
+  const badge = document.getElementById("tickerBadge");
+  if(badge) badge.innerText = t.tickerBadge || "📢";
+  const msg = t.tickerMsg || "";
+  ["tickerText1","tickerText2","tickerText3"].forEach(id => {
+    const el = document.getElementById(id); if(el) el.innerText = msg;
+  });
   
   const outEl = document.getElementById("out");
   const outTxt = outEl.innerText.trim();
