@@ -245,6 +245,36 @@
   .smartWhyText ul { margin: 8px 0; padding-inline-start: 24px; }
   .smartWhyText li { margin-bottom: 6px; }
 
+  /* ===== قسم VIP ===== */
+  .ai-key-section { margin-bottom: 14px; border-radius: 18px; border: 1.5px solid var(--border); overflow: hidden; background: var(--card); transition: border-color 0.4s, box-shadow 0.4s; }
+  .ai-key-section.vip-active { border-color: #f59e0b; box-shadow: 0 0 0 3px rgba(245,158,11,0.12), 0 8px 24px rgba(245,158,11,0.12); }
+  .ai-status-bar { display: flex; align-items: center; gap: 12px; padding: 13px 16px; cursor: pointer; user-select: none; background: var(--input); transition: background 0.3s; position: relative; overflow: hidden; }
+  .ai-key-section.vip-active .ai-status-bar { background: linear-gradient(135deg, rgba(245,158,11,0.13), rgba(217,119,6,0.07)); }
+  .ai-status-bar::before { content: ''; position: absolute; inset: 0; background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.06) 50%, transparent 100%); transform: translateX(-100%); transition: none; pointer-events: none; }
+  .ai-key-section.vip-active .ai-status-bar::before { animation: vipShimmer 3s ease-in-out infinite; }
+  @keyframes vipShimmer { 0%{transform:translateX(-100%)} 50%{transform:translateX(100%)} 100%{transform:translateX(100%)} }
+  .vip-icon-wrap { width: 42px; height: 42px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 20px; background: var(--bg); border: 1.5px solid var(--border); flex-shrink: 0; transition: all 0.3s; }
+  .ai-key-section.vip-active .vip-icon-wrap { background: linear-gradient(135deg, #fbbf24, #d97706); border-color: transparent; box-shadow: 0 4px 12px rgba(245,158,11,0.35); }
+  .ai-status-info { flex: 1; min-width: 0; }
+  .ai-status-title { font-size: 14px; font-weight: 900; color: var(--text); line-height: 1.3; transition: color 0.3s; }
+  .ai-key-section.vip-active .ai-status-title { background: linear-gradient(90deg,#f59e0b,#d97706); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+  .ai-status-sub { font-size: 11px; font-weight: 600; color: var(--muted); margin-top: 2px; transition: color 0.3s; }
+  .ai-key-section.vip-active .ai-status-sub { color: #b45309; }
+  .dark .ai-key-section.vip-active .ai-status-sub { color: #fcd34d; }
+  .ai-gear-btn { background: none; border: none; cursor: pointer; font-size: 16px; padding: 4px; color: var(--muted); transition: transform 0.3s, color 0.3s; line-height: 1; border-radius: 8px; }
+  .ai-gear-btn:hover { color: var(--text); background: var(--border); }
+  .ai-gear-btn.open { transform: rotate(90deg); }
+  .ai-key-panel { padding: 14px 16px; border-top: 1px solid var(--border); display: none; flex-direction: column; gap: 10px; background: var(--out); }
+  .ai-key-panel.show { display: flex; }
+  .ai-key-row { display: flex; gap: 8px; align-items: center; }
+  .ai-key-row input[type="password"] { flex: 1; font-size: 13px; font-family: monospace; padding: 11px 14px; border-radius: 12px; border: 1.5px solid var(--border); background: var(--card); color: var(--text); direction: ltr; text-align: left; width: 100%; box-sizing: border-box; transition: border-color 0.2s, box-shadow 0.2s; }
+  .ai-key-row input[type="password"]:focus { outline: none; border-color: #f59e0b; box-shadow: 0 0 0 3px rgba(245,158,11,0.18); }
+  .ai-save-btn { padding: 11px 18px; border-radius: 12px; border: none; background: linear-gradient(135deg,#f59e0b,#d97706); color: #1a0f00; font-size: 13px; font-weight: 900; cursor: pointer; font-family: inherit; white-space: nowrap; flex-shrink: 0; box-shadow: 0 4px 12px rgba(245,158,11,0.3); transition: all 0.2s; }
+  .ai-save-btn:hover { background: linear-gradient(135deg,#fbbf24,#f59e0b); transform: translateY(-2px); box-shadow: 0 6px 18px rgba(245,158,11,0.4); }
+  .ai-clear-btn { padding: 11px 13px; border-radius: 12px; border: 1px solid var(--border); background: var(--card); color: var(--muted); font-size: 14px; cursor: pointer; flex-shrink: 0; transition: all 0.2s; }
+  .ai-clear-btn:hover { background: var(--error-bg); color: var(--error-text); border-color: var(--error-border); transform: translateY(-1px); }
+  .ai-key-hint { font-size: 12px; color: var(--muted); font-weight: 600; display: flex; align-items: center; gap: 5px; }
+
   /* ===== شريط الإعلان المتحرك ===== */
   .news-ticker {
     width: 100%;
@@ -376,6 +406,26 @@
   <!-- منطقة رفع الصورة الجديدة -->
   <div class="upload-section" id="uploadArea">
     <div class="upload-label" id="uploadText">📷 رفع تقرير الاستطلاع</div>
+
+    <!-- قسم VIP -->
+    <div class="ai-key-section" id="aiKeySection">
+      <div class="ai-status-bar" onclick="toggleAiPanel()">
+        <div class="vip-icon-wrap" id="vipIconWrap">🔐</div>
+        <div class="ai-status-info">
+          <div class="ai-status-title" id="aiStatusTitle">دخول VIP</div>
+          <div class="ai-status-sub" id="aiStatusSub">ذكاء متقدم في قراءة الصور</div>
+        </div>
+        <button class="ai-gear-btn" id="aiGearBtn" type="button">⚙️</button>
+      </div>
+      <div class="ai-key-panel" id="aiKeyPanel">
+        <div class="ai-key-row">
+          <input type="password" id="geminiKeyInput" placeholder="🔑 أدخل مفتاح VIP..." autocomplete="off" dir="ltr">
+          <button class="ai-save-btn" id="aiSaveBtn" type="button" onclick="saveGeminiKey()">تفعيل</button>
+          <button class="ai-clear-btn" type="button" onclick="clearGeminiKey()">🗑️</button>
+        </div>
+        <div class="ai-key-hint" id="aiKeyHint">🌟 ذكاء متقدم في قراءة الصور — VIP</div>
+      </div>
+    </div>
 
     <div class="upload-btns">
       <!-- مكتبة الصور -->
@@ -896,6 +946,108 @@ function consensusVote(allParsed, allData) {
     return result;
 }
 
+/* ===== Gemini AI Vision ===== */
+function fileToBase64(file) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload  = () => resolve(reader.result.split(',')[1]);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+    });
+}
+
+async function readImageWithGemini(file, apiKey) {
+    const base64   = await fileToBase64(file);
+    const mimeType = file.type || 'image/jpeg';
+    const prompt   = `This is a screenshot from a strategy mobile game showing a scout/spy report.
+Find exactly three troop numbers: Snipers (قناص), Fighters (مقاتل), Cavalry (جوال).
+Numbers appear in formats like: 360k, 1.2m, 500.0k — always with k or m suffix.
+Return ONLY a JSON object: {"sni":"360k","inf":"1.2m","cav":"500k"}
+If a value is missing write "0". Return ONLY the JSON, nothing else.`;
+
+    const resp = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
+        {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                contents: [{ parts: [{ text: prompt }, { inline_data: { mime_type: mimeType, data: base64 } }] }],
+                generationConfig: { temperature: 0, maxOutputTokens: 120 }
+            })
+        }
+    );
+    if (!resp.ok) {
+        const e = await resp.json().catch(() => ({}));
+        throw new Error(e.error?.message || `Gemini HTTP ${resp.status}`);
+    }
+    const data = await resp.json();
+    const text = (data.candidates?.[0]?.content?.parts?.[0]?.text || '').trim();
+    const m    = text.match(/\{[^}]+\}/);
+    if (!m) throw new Error('لم يرجع Gemini JSON صالح');
+    return JSON.parse(m[0]);
+}
+
+function getGeminiKey()    { return safeGetStorage('F11_GEMINI_KEY') || ''; }
+
+function saveGeminiKey() {
+    const t   = T[LANG] || T.ar;
+    const val = (document.getElementById('geminiKeyInput').value || '').trim();
+    if (!val.startsWith('AIza') || val.length < 20) { toast(t.vipBadKey || '❌ مفتاح غير صحيح'); return; }
+    safeSetStorage('F11_GEMINI_KEY', val);
+    updateAiStatus();
+    document.getElementById('aiKeyPanel').classList.remove('show');
+    document.getElementById('aiGearBtn').classList.remove('open');
+    toast(t.vipSaved || '👑 VIP مفعّل!');
+}
+
+function clearGeminiKey() {
+    const t = T[LANG] || T.ar;
+    safeSetStorage('F11_GEMINI_KEY', '');
+    document.getElementById('geminiKeyInput').value = '';
+    updateAiStatus();
+    toast(t.vipCleared || '🗑️ تم الإلغاء');
+}
+
+function toggleAiPanel() {
+    const panel = document.getElementById('aiKeyPanel');
+    const btn   = document.getElementById('aiGearBtn');
+    const open  = panel.classList.contains('show');
+    panel.classList.toggle('show', !open);
+    btn.classList.toggle('open', !open);
+    if (!open) {
+        const k = getGeminiKey();
+        if (k) document.getElementById('geminiKeyInput').value = k;
+    }
+}
+
+function updateAiStatus() {
+    const key     = getGeminiKey();
+    const t       = T[LANG] || T.ar;
+    const section = document.getElementById('aiKeySection');
+    const iconW   = document.getElementById('vipIconWrap');
+    const title   = document.getElementById('aiStatusTitle');
+    const sub     = document.getElementById('aiStatusSub');
+    const inp     = document.getElementById('geminiKeyInput');
+    const saveBtn = document.getElementById('aiSaveBtn');
+    const hint    = document.getElementById('aiKeyHint');
+    if (!title) return;
+    // نص الـ placeholder وزر التفعيل والـ hint
+    if (inp)     inp.placeholder = t.vipPlaceholder || '🔑 VIP Key...';
+    if (saveBtn) saveBtn.innerText = t.vipSave || 'تفعيل';
+    if (hint)    hint.innerText = t.vipHint || '🌟 ذكاء متقدم في قراءة الصور — VIP';
+    if (key) {
+        section?.classList.add('vip-active');
+        if (iconW) iconW.innerText = '👑';
+        title.innerText = t.vipActive    || '👑 VIP مفعّل';
+        if (sub) sub.innerText = t.vipSubActive || '✨ Gemini يقرأ صورك بدقة عالية';
+    } else {
+        section?.classList.remove('vip-active');
+        if (iconW) iconW.innerText = '🔐';
+        title.innerText = t.vipInactive  || 'دخول VIP';
+        if (sub) sub.innerText = t.vipSub || 'ذكاء متقدم في قراءة الصور';
+    }
+}
+
 /* ============== الدالة الرئيسية لرفع الصورة (قراءة كل رقم على حدة + مقارنة) ============== */
 async function handleImageUpload(event) {
     const file = event.target.files[0];
@@ -908,6 +1060,34 @@ async function handleImageUpload(event) {
     const loadText = document.getElementById("loadingText");
     overlay.style.display = "flex";
 
+    // ── Gemini AI أولاً (إن وُجد Key) ──
+    const geminiKey = getGeminiKey();
+    if (geminiKey) {
+        try {
+            if (loadText) loadText.innerText = (T[LANG]||T.ar).vipLoading || "✨ Gemini AI يقرأ الصورة...";
+            const aiResult = await readImageWithGemini(file, geminiKey);
+            const isOK = v => /^\d+\.?\d*[km]$|^0$/.test((v||'').toLowerCase());
+            const inf  = (aiResult.inf || aiResult.fighter || "0").toLowerCase();
+            const sni  = (aiResult.sni || aiResult.sniper  || "0").toLowerCase();
+            const cav  = (aiResult.cav || aiResult.cavalry || "0").toLowerCase();
+            if ([inf, sni, cav].some(isOK)) {
+                document.getElementById("enInf").value = isOK(inf) ? inf : "0";
+                document.getElementById("enSni").value = isOK(sni) ? sni : "0";
+                document.getElementById("enCav").value = isOK(cav) ? cav : "0";
+                toast(`✨ AI: ${inf} · ${sni} · ${cav}`);
+                overlay.style.display = "none";
+                document.querySelectorAll('.upload-btn input[type="file"]').forEach(i => i.value = "");
+                setTimeout(() => smartAnalyze(), 400);
+                return;
+            }
+            toast("⚠️ Gemini لم يجد أرقاماً كافية، جاري المحاولة بالطريقة العادية...");
+        } catch(gemErr) {
+            console.warn("⚠️ Gemini فشل:", gemErr.message);
+            toast("⚠️ Gemini فشل — جاري الاستخدام الاحتياطي...");
+        }
+    }
+
+    // ── Tesseract كبديل احتياطي ──
     try {
         if (typeof Tesseract === "undefined") {
             throw new Error("مكتبة OCR لم تُحمَّل. تحقق من اتصال الإنترنت وأعد تحميل الصفحة.");
@@ -1105,7 +1285,12 @@ const T = {
     loadingText: "🤖 جاري تحليل التقرير بدقة...",
     ocrFail: "الرجاء التأكد أن الصورة لتقرير الاستطلاع، وتكون الأرقام واضحة.",
     tickerBadge: "📢 جديد",
-    tickerMsg: "🚧 إضافة الصور قيد التطوير — سيتم رفع مستوى الذكاء الاصطناعي في أقرب وقت ممكن ✨"
+    tickerMsg: "🚧 إضافة الصور قيد التطوير — سيتم رفع مستوى الذكاء الاصطناعي في أقرب وقت ممكن ✨",
+    vipInactive: "دخول VIP", vipActive: "👑 VIP مفعّل",
+    vipSub: "ذكاء متقدم في قراءة الصور", vipSubActive: "✨ Gemini يقرأ صورك بدقة عالية",
+    vipPlaceholder: "🔑 أدخل مفتاح VIP...", vipHint: "🌟 ذكاء متقدم في قراءة الصور — VIP",
+    vipSave: "تفعيل", vipSaved: "👑 تم تفعيل VIP بنجاح!", vipBadKey: "❌ مفتاح VIP غير صحيح",
+    vipCleared: "🗑️ تم إلغاء VIP", vipLoading: "✨ Gemini AI يقرأ الصورة..."
   },
   en: {
     title: "<span class='daly-text'>Daly</span><span class='alpha-badge'>ALPHA</span>",
@@ -1162,7 +1347,12 @@ const T = {
     loadingText: "🤖 Analyzing screenshot accurately...",
     ocrFail: "Please ensure the image is a clear scout report.",
     tickerBadge: "📢 NEWS",
-    tickerMsg: "🚧 AI image upload is under development — Enhanced AI coming very soon ✨"
+    tickerMsg: "🚧 AI image upload is under development — Enhanced AI coming very soon ✨",
+    vipInactive: "VIP Access", vipActive: "👑 VIP Active",
+    vipSub: "Advanced AI image reading", vipSubActive: "✨ Gemini reads your images with high accuracy",
+    vipPlaceholder: "🔑 Enter VIP Key...", vipHint: "🌟 Advanced AI Vision — VIP",
+    vipSave: "Activate", vipSaved: "👑 VIP Activated!", vipBadKey: "❌ Invalid VIP Key",
+    vipCleared: "🗑️ VIP Removed", vipLoading: "✨ Gemini AI is reading the image..."
   },
   pt: {
     title: "<span class='daly-text'>Daly</span><span class='alpha-badge'>ALPHA</span>",
@@ -1219,7 +1409,12 @@ const T = {
     loadingText: "🤖 Analisando imagem...",
     ocrFail: "Certifique-se de que a imagem é um relatório de exploração claro.",
     tickerBadge: "📢 NOVIDADE",
-    tickerMsg: "🚧 Envio de imagens com IA em desenvolvimento — IA aprimorada chegando em breve ✨"
+    tickerMsg: "🚧 Envio de imagens com IA em desenvolvimento — IA aprimorada chegando em breve ✨",
+    vipInactive: "Acesso VIP", vipActive: "👑 VIP Ativo",
+    vipSub: "Leitura avançada de imagens com IA", vipSubActive: "✨ Gemini lê suas imagens com alta precisão",
+    vipPlaceholder: "🔑 Insira a Chave VIP...", vipHint: "🌟 Visão com IA Avançada — VIP",
+    vipSave: "Ativar", vipSaved: "👑 VIP Ativado!", vipBadKey: "❌ Chave VIP inválida",
+    vipCleared: "🗑️ VIP Removido", vipLoading: "✨ Gemini AI está lendo a imagem..."
   }
 };
 
@@ -1286,6 +1481,7 @@ function setLang(lang) {
   
   refreshDarkButtonText();
   setActiveBtn(lang);
+  updateAiStatus();
 }
 
 function refreshDarkButtonText() {
@@ -1572,6 +1768,7 @@ document.addEventListener("DOMContentLoaded", function() {
     if(savedDark === "1") document.body.classList.add("dark");
     refreshDarkButtonText();
     hideChart();
+    updateAiStatus();
   } catch(error) {}
 });
 </script>
