@@ -288,9 +288,15 @@
     display: inline-flex;
     white-space: nowrap;
     animation: tickerScroll 32s linear infinite;
+    -webkit-animation: tickerScroll 32s linear infinite;
     direction: ltr;
+    pointer-events: none;
+    will-change: transform;
+    transform: translateZ(0);
+    -webkit-transform: translateZ(0);
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
   }
-  .news-ticker-inner { pointer-events: none; }
   .news-ticker-text {
     font-size: 13.5px;
     font-weight: 800;
@@ -298,10 +304,16 @@
     padding: 0 70px;
     letter-spacing: 0.3px;
     text-shadow: 0 1px 6px rgba(0,0,0,0.35);
+    user-select: none;
+    -webkit-user-select: none;
   }
   @keyframes tickerScroll {
-    0%   { transform: translateX(80vw); }
-    100% { transform: translateX(-100%); }
+    0%   { transform: translateZ(0) translateX(80vw); }
+    100% { transform: translateZ(0) translateX(-100%); }
+  }
+  @-webkit-keyframes tickerScroll {
+    0%   { -webkit-transform: translateZ(0) translateX(80vw); }
+    100% { -webkit-transform: translateZ(0) translateX(-100%); }
   }
   @keyframes tickerBg {
     0%   { background-position: 0% 50%; }
@@ -1575,6 +1587,46 @@ document.addEventListener("DOMContentLoaded", function() {
         .catch(err => console.log('فشل تفعيل التطبيق', err));
     });
   }
+</script>
+
+<script>
+/* ===== مراقب الشريط المتحرك — يمنع التوقف على الهاتف ===== */
+(function() {
+  function forceTickerRun() {
+    var el = document.querySelector('.news-ticker-inner');
+    if (!el) return;
+    // إعادة تشغيل الأنيميشن بإزالته وإضافته من جديد
+    el.style.animation = 'none';
+    el.style.webkitAnimation = 'none';
+    void el.offsetWidth; // إجبار المتصفح على إعادة الرسم
+    el.style.animation = 'tickerScroll 32s linear infinite';
+    el.style.webkitAnimation = 'tickerScroll 32s linear infinite';
+  }
+
+  // عند رجوع الشاشة للنشاط (من الخلفية أو قفل الشاشة)
+  document.addEventListener('visibilitychange', function() {
+    if (document.visibilityState === 'visible') forceTickerRun();
+  });
+
+  // عند رفع الإصبع عن الشاشة في الهاتف
+  document.addEventListener('touchend', function() {
+    setTimeout(forceTickerRun, 100);
+  }, { passive: true });
+
+  // عند الضغط على الشاشة
+  document.addEventListener('touchstart', function() {
+    setTimeout(forceTickerRun, 100);
+  }, { passive: true });
+
+  // فحص دوري كل 3 ثوان — ضمان إضافي
+  setInterval(function() {
+    var el = document.querySelector('.news-ticker-inner');
+    if (!el) return;
+    var anim = window.getComputedStyle(el).animationPlayState
+            || window.getComputedStyle(el).webkitAnimationPlayState;
+    if (anim === 'paused') forceTickerRun();
+  }, 3000);
+})();
 </script>
 
 </body>
