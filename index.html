@@ -956,17 +956,28 @@ function fileToBase64(file) {
     });
 }
 
+/* كشف نوع الصورة من البيانات */
+function detectMime(file, base64) {
+    if (file.type && file.type.startsWith('image/')) return file.type;
+    const h = base64.substring(0, 12);
+    if (h.startsWith('/9j/'))   return 'image/jpeg';
+    if (h.startsWith('iVBOR')) return 'image/png';
+    if (h.startsWith('UklGR')) return 'image/webp';
+    return 'image/jpeg';
+}
+
 async function readImageWithGemini(file, apiKey) {
     const base64   = await fileToBase64(file);
-    const mimeType = file.type || 'image/jpeg';
-    const prompt   = `This is a screenshot from a strategy mobile game scout report with troop numbers.
-Find exactly three values: Snipers (قناص), Fighters (مقاتل), Cavalry (جوال).
-Numbers use formats like: 360k, 1.2m, 500.0k (k=thousands, m=millions).
-Return ONLY this JSON: {"sni":"360k","inf":"1.2m","cav":"500k"}
-Use "0" if not found. No explanation, ONLY the JSON object.`;
+    const mimeType = detectMime(file, base64);
+    const prompt   = `You are analyzing a strategy game scout report screenshot.
+Find these three troop numbers: Snipers (قناص), Fighters (مقاتل), Cavalry (جوال).
+Numbers format: 360k / 1.2m / 500.0k
+Respond with ONLY this JSON (no markdown, no explanation):
+{"sni":"360k","inf":"1.2m","cav":"500k"}
+Use "0" for any missing value.`;
 
-    const models = ['gemini-1.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash-8b'];
-    let lastErr  = null;
+    /* نماذج مثبّتة تعمل مع الـ Free Tier */
+    const models = ['gemini-1.5-flash', 'gemini-1.5-pro'];
 
     for (const model of models) {
         try {
@@ -976,50 +987,104 @@ Use "0" if not found. No explanation, ONLY the JSON object.`;
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        contents: [{ parts: [{ text: prompt }, { inline_data: { mime_type: mimeType, data: base64 } }] }],
-                        generationConfig: { temperature: 0, maxOutputTokens: 150 }
+                        contents: [{ parts: [
+                            { text: prompt },
+                            { inline_data: { mime_type: mimeType, data: base64 } }
+                        ]}],
+                        generationConfig: { temperature: 0, maxOutputTokens: 200 },
+                        safetySettings: [
+                            { category: 'HARM_CATEGORY_HARASSMENT',        threshold: 'BLOCK_NONE' },
+                            { category: 'HARM_CATEGORY_HATE_SPEECH',       threshold: 'BLOCK_NONE' },
+                            { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_NONE' },
+                            { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_NONE' }
+                        ]
                     })
                 }
             );
-            const respText = await resp.text();
-            console.log(`📡 Gemini (${model}) status=${resp.status}`, respText.substring(0, 300));
+
+            const bodyText = await resp.text();
+            console.log(`📡 Gemini [${model}] status=${resp.status} →`, bodyText.substring(0, 400));
+
             if (!resp.ok) {
-                let errMsg = `HTTP ${resp.status}`;
-                try { errMsg = JSON.parse(respText)?.error?.message || errMsg; } catch(_) {}
-                // مفتاح خاطئ / غير مصرح / طلب خاطئ — توقف فوراً
-                if (resp.status === 400 || resp.status === 401 || resp.status === 403) {
-                    throw new Error('KEY_ERROR: ' + errMsg);
-                }
-                lastErr = new Error(`[${model}] ${errMsg}`);
+                let msg = `HTTP ${resp.status}`;
+                try { msg = JSON.parse(bodyText)?.error?.message || msg; } catch(_) {}
+                // مفتاح خاطئ → توقف فوراً
+                if (resp.status === 401 || resp.status === 403 || resp.status === 400) throw new Error('KEYERR:' + msg);
+                // نموذج غير موجود → جرّب التالي
+                if (resp.status === 404) { console.warn(`⚠️ ${model} غير موجود`); continue; }
+                throw new Error(msg);
+            }
+
+            const data = JSON.parse(bodyText);
+            const cand = data.candidates?.[0];
+
+            if (!cand || !cand.content) {
+                const reason = cand?.finishReason || 'UNKNOWN';
+                console.warn(`⚠️ Gemini [${model}] blocked: ${reason}`);
                 continue;
             }
-            let data;
-            try { data = JSON.parse(respText); } catch(_) { lastErr = new Error(`[${model}] JSON parse error`); continue; }
-            const text = (data.candidates?.[0]?.content?.parts?.[0]?.text || '').trim();
-            console.log(`✅ Gemini (${model}) text →`, text);
-            if (!text) { lastErr = new Error(`[${model}] رد فارغ`); continue; }
+
+            const text = (cand.content.parts?.[0]?.text || '').trim();
+            console.log(`✅ Gemini [${model}] text:`, text);
+
             const m = text.match(/\{[\s\S]*?\}/);
-            if (!m) { lastErr = new Error(`[${model}] لا يوجد JSON`); continue; }
+            if (!m) { console.warn('No JSON in response'); continue; }
             return JSON.parse(m[0]);
+
         } catch(e) {
-            if ((e.message || '').startsWith('KEY_ERROR')) throw new Error((e.message).replace('KEY_ERROR: ', ''));
-            lastErr = e;
+            const msg = e.message || '';
+            if (msg.startsWith('KEYERR:')) throw new Error(msg.replace('KEYERR:', ''));
+            console.error(`❌ Gemini [${model}]:`, msg);
         }
     }
-    throw lastErr || new Error('فشلت جميع نماذج Gemini');
+    throw new Error('تعذّر الاتصال بـ Gemini — تحقق من الـ Key أو الإنترنت');
 }
 
 function getGeminiKey()    { return safeGetStorage('F11_GEMINI_KEY') || ''; }
 
-function saveGeminiKey() {
+async function saveGeminiKey() {
     const t   = T[LANG] || T.ar;
     const val = (document.getElementById('geminiKeyInput').value || '').trim();
     if (!val.startsWith('AIza') || val.length < 20) { toast(t.vipBadKey || '❌ مفتاح غير صحيح'); return; }
-    safeSetStorage('F11_GEMINI_KEY', val);
-    updateAiStatus();
-    document.getElementById('aiKeyPanel').classList.remove('show');
-    document.getElementById('aiGearBtn').classList.remove('open');
-    toast(t.vipSaved || '👑 VIP مفعّل!');
+
+    // ── اختبار المفتاح قبل الحفظ ──
+    const btn = document.getElementById('aiSaveBtn');
+    btn.innerText = '⏳';
+    btn.disabled  = true;
+
+    try {
+        const resp = await fetch(
+            `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${val}`,
+            {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    contents: [{ parts: [{ text: 'reply with one word: OK' }] }],
+                    generationConfig: { maxOutputTokens: 5 }
+                })
+            }
+        );
+        const body = await resp.text();
+        if (!resp.ok) {
+            let msg = `HTTP ${resp.status}`;
+            try { msg = JSON.parse(body)?.error?.message || msg; } catch(_) {}
+            throw new Error(msg);
+        }
+        // ✅ الـ Key يعمل — احفظه
+        safeSetStorage('F11_GEMINI_KEY', val);
+        updateAiStatus();
+        document.getElementById('aiKeyPanel').classList.remove('show');
+        document.getElementById('aiGearBtn').classList.remove('open');
+        toast(t.vipSaved || '👑 VIP مفعّل!');
+    } catch(e) {
+        const msg = (e.message || '');
+        const detail = msg.length > 80 ? msg.substring(0, 80) + '…' : msg;
+        toast('❌ ' + detail);
+        console.error('VIP Key Test Failed:', msg);
+    } finally {
+        btn.innerText = t.vipSave || 'تفعيل';
+        btn.disabled  = false;
+    }
 }
 
 function clearGeminiKey() {
