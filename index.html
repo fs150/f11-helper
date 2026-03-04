@@ -959,32 +959,47 @@ function fileToBase64(file) {
 async function readImageWithGemini(file, apiKey) {
     const base64   = await fileToBase64(file);
     const mimeType = file.type || 'image/jpeg';
-    const prompt   = `This is a screenshot from a strategy mobile game showing a scout/spy report.
-Find exactly three troop numbers: Snipers (قناص), Fighters (مقاتل), Cavalry (جوال).
-Numbers appear in formats like: 360k, 1.2m, 500.0k — always with k or m suffix.
-Return ONLY a JSON object: {"sni":"360k","inf":"1.2m","cav":"500k"}
-If a value is missing write "0". Return ONLY the JSON, nothing else.`;
+    const prompt   = `This is a screenshot from a strategy mobile game scout report with troop numbers.
+Find exactly three values: Snipers (قناص), Fighters (مقاتل), Cavalry (جوال).
+Numbers use formats like: 360k, 1.2m, 500.0k (k=thousands, m=millions).
+Return ONLY this JSON: {"sni":"360k","inf":"1.2m","cav":"500k"}
+Use "0" if not found. No explanation, ONLY the JSON object.`;
 
-    const resp = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
-        {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                contents: [{ parts: [{ text: prompt }, { inline_data: { mime_type: mimeType, data: base64 } }] }],
-                generationConfig: { temperature: 0, maxOutputTokens: 120 }
-            })
+    const models = ['gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-flash-latest'];
+    let lastErr  = null;
+
+    for (const model of models) {
+        try {
+            const resp = await fetch(
+                `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
+                {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        contents: [{ parts: [{ text: prompt }, { inline_data: { mime_type: mimeType, data: base64 } }] }],
+                        generationConfig: { temperature: 0, maxOutputTokens: 150 }
+                    })
+                }
+            );
+            if (!resp.ok) {
+                const e = await resp.json().catch(() => ({}));
+                const msg = e.error?.message || `HTTP ${resp.status}`;
+                if (resp.status === 400 || resp.status === 403) throw new Error(msg);
+                lastErr = new Error(`[${model}] ${msg}`);
+                continue;
+            }
+            const data = await resp.json();
+            const text = (data.candidates?.[0]?.content?.parts?.[0]?.text || '').trim();
+            console.log(`✅ Gemini (${model}) →`, text);
+            const m = text.match(/\{[\s\S]*?\}/);
+            if (!m) { lastErr = new Error(`[${model}] لا يوجد JSON في الرد`); continue; }
+            return JSON.parse(m[0]);
+        } catch(e) {
+            if (e.message.includes('400') || e.message.includes('403')) throw e;
+            lastErr = e;
         }
-    );
-    if (!resp.ok) {
-        const e = await resp.json().catch(() => ({}));
-        throw new Error(e.error?.message || `Gemini HTTP ${resp.status}`);
     }
-    const data = await resp.json();
-    const text = (data.candidates?.[0]?.content?.parts?.[0]?.text || '').trim();
-    const m    = text.match(/\{[^}]+\}/);
-    if (!m) throw new Error('لم يرجع Gemini JSON صالح');
-    return JSON.parse(m[0]);
+    throw lastErr || new Error('فشلت جميع نماذج Gemini');
 }
 
 function getGeminiKey()    { return safeGetStorage('F11_GEMINI_KEY') || ''; }
@@ -1083,7 +1098,8 @@ async function handleImageUpload(event) {
             toast("⚠️ Gemini لم يجد أرقاماً كافية، جاري المحاولة بالطريقة العادية...");
         } catch(gemErr) {
             console.warn("⚠️ Gemini فشل:", gemErr.message);
-            toast("⚠️ Gemini فشل — جاري الاستخدام الاحتياطي...");
+            const isKeyErr = /403|401|API key|invalid/i.test(gemErr.message);
+            toast(isKeyErr ? "❌ مفتاح VIP غير صحيح — تحقق منه" : "⚠️ Gemini فشل، جاري المحاولة الاحتياطية...");
         }
     }
 
