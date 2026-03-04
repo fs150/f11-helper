@@ -965,7 +965,7 @@ Numbers use formats like: 360k, 1.2m, 500.0k (k=thousands, m=millions).
 Return ONLY this JSON: {"sni":"360k","inf":"1.2m","cav":"500k"}
 Use "0" if not found. No explanation, ONLY the JSON object.`;
 
-    const models = ['gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-flash-latest'];
+    const models = ['gemini-1.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash-8b'];
     let lastErr  = null;
 
     for (const model of models) {
@@ -981,21 +981,28 @@ Use "0" if not found. No explanation, ONLY the JSON object.`;
                     })
                 }
             );
+            const respText = await resp.text();
+            console.log(`📡 Gemini (${model}) status=${resp.status}`, respText.substring(0, 300));
             if (!resp.ok) {
-                const e = await resp.json().catch(() => ({}));
-                const msg = e.error?.message || `HTTP ${resp.status}`;
-                if (resp.status === 400 || resp.status === 403) throw new Error(msg);
-                lastErr = new Error(`[${model}] ${msg}`);
+                let errMsg = `HTTP ${resp.status}`;
+                try { errMsg = JSON.parse(respText)?.error?.message || errMsg; } catch(_) {}
+                // مفتاح خاطئ / غير مصرح / طلب خاطئ — توقف فوراً
+                if (resp.status === 400 || resp.status === 401 || resp.status === 403) {
+                    throw new Error('KEY_ERROR: ' + errMsg);
+                }
+                lastErr = new Error(`[${model}] ${errMsg}`);
                 continue;
             }
-            const data = await resp.json();
+            let data;
+            try { data = JSON.parse(respText); } catch(_) { lastErr = new Error(`[${model}] JSON parse error`); continue; }
             const text = (data.candidates?.[0]?.content?.parts?.[0]?.text || '').trim();
-            console.log(`✅ Gemini (${model}) →`, text);
+            console.log(`✅ Gemini (${model}) text →`, text);
+            if (!text) { lastErr = new Error(`[${model}] رد فارغ`); continue; }
             const m = text.match(/\{[\s\S]*?\}/);
-            if (!m) { lastErr = new Error(`[${model}] لا يوجد JSON في الرد`); continue; }
+            if (!m) { lastErr = new Error(`[${model}] لا يوجد JSON`); continue; }
             return JSON.parse(m[0]);
         } catch(e) {
-            if (e.message.includes('400') || e.message.includes('403')) throw e;
+            if ((e.message || '').startsWith('KEY_ERROR')) throw new Error((e.message).replace('KEY_ERROR: ', ''));
             lastErr = e;
         }
     }
@@ -1054,7 +1061,7 @@ function updateAiStatus() {
         section?.classList.add('vip-active');
         if (iconW) iconW.innerText = '👑';
         title.innerText = t.vipActive    || '👑 VIP مفعّل';
-        if (sub) sub.innerText = t.vipSubActive || '✨ Gemini يقرأ صورك بدقة عالية';
+        if (sub) sub.innerText = t.vipSubActive || '✨ يقرأ صورك بدقة عالية';
     } else {
         section?.classList.remove('vip-active');
         if (iconW) iconW.innerText = '🔐';
@@ -1097,9 +1104,13 @@ async function handleImageUpload(event) {
             }
             toast("⚠️ Gemini لم يجد أرقاماً كافية، جاري المحاولة بالطريقة العادية...");
         } catch(gemErr) {
-            console.warn("⚠️ Gemini فشل:", gemErr.message);
-            const isKeyErr = /403|401|API key|invalid/i.test(gemErr.message);
-            toast(isKeyErr ? "❌ مفتاح VIP غير صحيح — تحقق منه" : "⚠️ Gemini فشل، جاري المحاولة الاحتياطية...");
+            const errMsg = gemErr.message || '';
+            console.warn("⚠️ Gemini فشل:", errMsg);
+            const isKeyErr = /403|401|API key|invalid|not valid|permission/i.test(errMsg);
+            const isNet    = /fetch|network|Failed to fetch|NetworkError/i.test(errMsg);
+            if (isKeyErr)     toast("❌ مفتاح VIP غير صحيح — اضغط ⚙️ وأدخله من جديد");
+            else if (isNet)   toast("❌ تحقق من الاتصال بالإنترنت");
+            else               toast("⚠️ Gemini: " + errMsg.substring(0, 60));
         }
     }
 
