@@ -272,7 +272,16 @@ for(let i=0;i<30;i++){
 
 /* Countdown + Progress — مترابطان */
 const TOTAL = 7 * 3600 * 1000;
-const end = Date.now() + TOTAL;
+const STORAGE_KEY = 'maintenance_end_time';
+
+let storedEnd = localStorage.getItem(STORAGE_KEY);
+let end;
+if (!storedEnd || isNaN(Number(storedEnd))) {
+  end = Date.now() + TOTAL;
+  localStorage.setItem(STORAGE_KEY, end);
+} else {
+  end = Number(storedEnd);
+}
 const fillEl = document.querySelector('.progress-fill');
 const pctEl  = document.getElementById('pct');
 const steps  = document.querySelectorAll('.step');
