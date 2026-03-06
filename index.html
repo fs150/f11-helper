@@ -1,0 +1,2134 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Daly Alpha</title>
+<!-- إعدادات تطبيق الهاتف (PWA) -->
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#f59e0b">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Daly Alpha">
+<link rel="apple-touch-icon" href="camp.png">
+
+<!-- خط تجوال -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800;900&display=swap" rel="stylesheet">
+
+<!-- Tesseract.js: OCR بدون API key -->
+<script src="https://unpkg.com/tesseract.js@5/dist/tesseract.min.js"></script>
+
+<style>
+  :root {
+    --bg: #f8f9fa;
+    --card: #ffffff;
+    --text: #2b2d42;
+    --muted: #8d99ae;
+    --border: #e2e8f0;
+    --input: #f1f5f9;
+    --input-focus: #ffffff;
+    --out: #f8fafc;
+    --btn: #d97706;
+    --btn-hover: #b45309;
+    --btnText: #ffffff;
+    --shadow: rgba(0, 0, 0, 0.05);
+    --shadow-hover: rgba(0, 0, 0, 0.1);
+    --primary-glow: rgba(217, 119, 6, 0.2);
+    --error-bg: #fee2e2;
+    --error-text: #b91c1c;
+    --error-border: #fca5a5;
+  }
+  
+  body.dark {
+    --bg: #0f1115;
+    --card: #1a1d24;
+    --text: #f1f5f9;
+    --muted: #94a3b8;
+    --border: #2a3040;
+    --input: #111522;
+    --input-focus: #1e2538;
+    --out: #111522;
+    --btn: #f59e0b;
+    --btn-hover: #fbbf24;
+    --btnText: #111827;
+    --shadow: rgba(0, 0, 0, 0.3);
+    --shadow-hover: rgba(0, 0, 0, 0.5);
+    --primary-glow: rgba(245, 158, 11, 0.15);
+    --error-bg: #450a0a;
+    --error-text: #fecaca;
+    --error-border: #991b1b;
+  }
+
+  body { font-family: 'Tajawal', Arial, sans-serif; max-width: 760px; margin: auto; padding: 20px 14px; background: var(--bg); color: var(--text); transition: background-color 0.3s ease, color 0.3s ease; }
+
+  .topbar { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 24px; position: relative; z-index: 5; }
+  .langBtns { display: flex; gap: 8px; background: var(--card); padding: 6px; border-radius: 16px; box-shadow: 0 2px 10px var(--shadow); border: 1px solid var(--border); }
+  .langBtn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 14px; border: none; border-radius: 10px; background: transparent; cursor: pointer; font-size: 14px; font-weight: 700; font-family: inherit; color: var(--muted); transition: all 0.2s ease; }
+  .langBtn:hover { color: var(--text); background: var(--input); }
+  .langBtn.active { background: var(--btn); color: var(--btnText); box-shadow: 0 4px 12px var(--primary-glow); }
+  .toggles { display: flex; }
+  .toggleBtn { padding: 10px 18px; border: 1px solid var(--border); border-radius: 14px; background: var(--card); cursor: pointer; font-size: 14px; font-weight: 700; font-family: inherit; color: var(--text); box-shadow: 0 2px 10px var(--shadow); transition: all 0.2s ease; }
+  .toggleBtn:hover { transform: translateY(-2px); box-shadow: 0 6px 15px var(--shadow-hover); }
+
+  @media (max-width: 720px) { .topbar { flex-direction: column; align-items: stretch; } .langBtns { justify-content: center; flex-wrap: wrap; } .toggles { justify-content: center; flex-wrap: wrap; } }
+
+  .hero-container { text-align: center; margin: 15px auto 35px auto; display: flex; justify-content: center; align-items: center; position: relative; z-index: 1; }
+  .hero-container::before { content: ""; position: absolute; width: 220px; height: 220px; background: radial-gradient(circle, var(--primary-glow) 0%, transparent 65%); border-radius: 50%; z-index: -1; animation: pulseGlow 3s infinite alternate ease-in-out; filter: blur(15px); pointer-events: none; }
+  .hero-image { max-width: 260px; height: auto; object-fit: contain; filter: drop-shadow(0 20px 30px rgba(0,0,0,0.3)); transition: transform 0.4s ease, filter 0.4s ease; animation: floatCamp 4s ease-in-out infinite; pointer-events: none; }
+  @keyframes floatCamp { 0% { transform: translateY(0px); } 50% { transform: translateY(-12px); } 100% { transform: translateY(0px); } }
+  @keyframes pulseGlow { from { transform: scale(0.85); opacity: 0.6; } to { transform: scale(1.2); opacity: 1; } }
+
+  h2#title {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    margin: 5px 0 25px;
+    position: relative;
+    z-index: 2;
+  }
+  .daly-text {
+    font-size: 40px;
+    font-weight: 900;
+    color: var(--text);
+    letter-spacing: -0.5px;
+    line-height: 1;
+    text-shadow: 0 4px 15px var(--shadow);
+  }
+  .alpha-badge {
+    position: relative;
+    font-size: 14px;
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: 3px;
+    padding: 6px 12px 6px 15px; 
+    border-radius: 12px;
+    background: linear-gradient(135deg, var(--btn), var(--btn-hover));
+    color: var(--btnText);
+    box-shadow: 0 6px 20px var(--primary-glow), 
+                inset 0 2px 4px rgba(255,255,255,0.4), 
+                inset 0 -2px 6px rgba(0,0,0,0.2);
+    overflow: hidden;
+    display: inline-flex;
+    align-items: center;
+    line-height: 1;
+    font-family: 'Arial', sans-serif;
+  }
+  .alpha-badge::before {
+    content: '';
+    position: absolute;
+    top: 0; left: -100%;
+    width: 60%; height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.6), transparent);
+    transform: skewX(-20deg);
+    animation: badgeShine 3.5s infinite ease-in-out;
+  }
+  @keyframes badgeShine {
+    0% { left: -100%; }
+    20% { left: 200%; }
+    100% { left: 200%; }
+  }
+
+  .muted { color: var(--muted); font-size: 15px; text-align: center; margin-bottom: 20px; font-weight: 500; position: relative; z-index: 2; }
+
+  .box { border: 1px solid var(--border); border-radius: 24px; padding: 24px; margin: 10px 0; background: var(--card); box-shadow: 0 10px 30px var(--shadow); transition: all 0.3s ease; position: relative; z-index: 2; }
+
+  /* ===== منطقة رفع الصورة الجديدة ===== */
+  .upload-section { margin-bottom: 22px; }
+
+  /* ===== (API Key مدمج في الـ Worker — لا حاجة لحقل إدخال) ===== */
+  .upload-label { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 700; color: var(--muted); margin-bottom: 10px; text-transform: uppercase; letter-spacing: 1px; }
+  .upload-label::before, .upload-label::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+
+  .upload-btns { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+
+  .upload-btn {
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 8px; padding: 16px 8px; border-radius: 18px; border: 1.5px solid var(--border);
+    background: var(--card); cursor: pointer; transition: all 0.22s cubic-bezier(.34,1.56,.64,1);
+    position: relative; overflow: hidden; text-align: center;
+    box-shadow: 0 2px 12px var(--shadow);
+  }
+  .upload-btn input[type="file"] {
+    position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; z-index: 5;
+  }
+  .upload-btn:hover { transform: translateY(-3px) scale(1.04); box-shadow: 0 8px 24px var(--shadow-hover); border-color: var(--btn); }
+  .upload-btn:active { transform: scale(0.97); }
+
+  .upload-btn-icon {
+    width: 46px; height: 46px; border-radius: 14px; display: flex; align-items: center; justify-content: center;
+    font-size: 22px; transition: transform 0.3s ease;
+  }
+  .upload-btn:hover .upload-btn-icon { transform: scale(1.12) rotate(-5deg); }
+
+  .upload-btn-label { font-size: 12px; font-weight: 800; color: var(--text); line-height: 1.2; pointer-events: none; }
+  .upload-btn-sub   { font-size: 10px; font-weight: 500; color: var(--muted); pointer-events: none; }
+
+  .upload-btn.gallery  .upload-btn-icon { background: linear-gradient(135deg,#fbbf24,#d97706); }
+  .upload-btn.camera   .upload-btn-icon { background: linear-gradient(135deg,#34d399,#059669); }
+  .upload-btn.file     .upload-btn-icon { background: linear-gradient(135deg,#818cf8,#4f46e5); }
+
+  .upload-preview {
+    display: none; align-items: center; gap: 12px; margin-top: 12px;
+    padding: 10px 14px; border-radius: 14px;
+    background: linear-gradient(135deg,rgba(52,211,153,.12),rgba(5,150,105,.06));
+    border: 1px solid rgba(52,211,153,.35);
+  }
+  .upload-preview.show { display: flex; }
+  .upload-preview-thumb { width: 42px; height: 42px; border-radius: 10px; object-fit: cover; flex-shrink: 0; box-shadow: 0 2px 8px rgba(0,0,0,.15); }
+  .upload-preview-info  { flex: 1; min-width: 0; }
+  .upload-preview-name  { font-size: 13px; font-weight: 700; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .upload-preview-size  { font-size: 11px; color: var(--muted); margin-top: 2px; }
+  .upload-preview-close { background: none; border: none; font-size: 18px; cursor: pointer; color: var(--muted); padding: 0 4px; flex-shrink: 0; }
+  
+  .loading-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); display: none; align-items: center; justify-content: center; flex-direction: column; color: white; font-weight: bold; z-index: 999; border-radius: 24px; }
+  .spinner { width: 45px; height: 45px; border: 4px solid rgba(255,255,255,0.2); border-top-color: var(--btn); border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 15px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .inputs-container { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 20px; position: relative; z-index: 3; }
+  .input-wrapper { background: var(--input); border: 2px solid transparent; border-radius: 16px; padding: 12px; transition: all 0.3s ease; }
+  .input-wrapper:focus-within { background: var(--input-focus); border-color: var(--btn); box-shadow: 0 0 0 4px var(--primary-glow); }
+
+  label { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; font-weight: 800; font-size: 15px; color: var(--text); }
+  .game-icon { width: 36px; height: 36px; object-fit: contain; vertical-align: middle; filter: drop-shadow(0 4px 8px rgba(0,0,0,0.15)); transition: transform 0.3s ease; }
+  .input-wrapper:hover .game-icon { transform: scale(1.1) rotate(-5deg); }
+
+  input[type="text"] { width: 100%; padding: 12px; border: 1px solid var(--border); border-radius: 12px; font-size: 16px; font-weight: 700; font-family: inherit; text-align: center; background: var(--card); color: var(--text); box-sizing: border-box; transition: all 0.2s ease; }
+  input[type="text"]:focus { outline: none; border-color: var(--btn); }
+
+  .actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 10px; position: relative; z-index: 3; }
+  button { font-family: inherit; font-weight: 700; display: flex; align-items: center; justify-content: center; gap: 8px; transition: all 0.2s ease; }
+  button.primary { flex: 1 1 45%; padding: 16px; border: 0; border-radius: 16px; background: var(--btn); color: var(--btnText); font-size: 16px; cursor: pointer; box-shadow: 0 4px 15px var(--primary-glow); }
+  button.primary:hover { background: var(--btn-hover); transform: translateY(-2px); box-shadow: 0 6px 20px var(--primary-glow); }
+  button.primary.smart { background: linear-gradient(135deg, #7c5cff, #2bb4ff); box-shadow: 0 4px 15px rgba(124, 92, 255, 0.25); }
+  button.primary.smart:hover { background: linear-gradient(135deg, #6a4ce6, #1fa3e6); box-shadow: 0 6px 20px rgba(124, 92, 255, 0.35); }
+  button.secondary { flex: 1 1 30%; padding: 14px; border: 1px solid var(--border); border-radius: 14px; background: var(--card); color: var(--text); font-size: 15px; cursor: pointer; }
+  button.secondary:hover { background: var(--input); transform: translateY(-2px); border-color: var(--muted); }
+
+  .out { background: var(--out); border: 1px solid var(--border); border-radius: 16px; padding: 20px; margin-top: 20px; white-space: pre-wrap; position: relative; overflow: hidden; font-weight: 500; line-height: 1.7; font-size: 15px; transform: translateZ(0); box-shadow: inset 0 2px 10px var(--shadow); transition: all 0.3s ease; }
+  .out.error { background: var(--error-bg); color: var(--error-text); border-color: var(--error-border); box-shadow: inset 0 2px 10px rgba(220, 38, 38, 0.1); }
+  .out.flash::before { content: ""; position: absolute; inset: -60%; background: radial-gradient(circle at 50% 50%, var(--primary-glow), transparent 60%); animation: pop 600ms ease-out; pointer-events: none; }
+  @keyframes pop { from { transform: scale(0.5); opacity: 0; } 50% { opacity: 1; } to { transform: scale(1.2); opacity: 0; } }
+
+  .pill { display: inline-flex; align-items: center; justify-content: center; padding: 4px 12px; border: 1px solid var(--border); border-radius: 999px; font-size: 13px; font-weight: 700; margin: 4px 3px; color: var(--text); background: var(--card); box-shadow: 0 2px 5px var(--shadow); }
+
+  .signature { margin-top: 24px; text-align: center; font-size: 15px; padding: 16px; border-radius: 16px; background: linear-gradient(135deg, #1e1e1e, #2b2b2b); color: #cfcfcf; box-shadow: 0 10px 25px rgba(0,0,0,0.15); font-weight: 500; position: relative; z-index: 2; }
+  .signature span { font-weight: 900; font-size: 18px; background: linear-gradient(45deg, #ffcc70, #ff8c00); -webkit-background-clip: text; -webkit-text-fill-color: transparent; letter-spacing: 2px; }
+
+  .chartWrap { margin-top: 24px; display: flex; gap: 20px; align-items: stretch; justify-content: center; flex-wrap: wrap; }
+  .chartCard { flex: 0 0 auto; width: 250px; height: 250px; border-radius: 24px; border: 1px solid var(--border); background: var(--card); display: flex; align-items: center; justify-content: center; position: relative; overflow: hidden; box-shadow: inset 0 4px 15px var(--shadow), 0 10px 30px var(--shadow); }
+  canvas#chart { width: 220px; height: 220px; filter: drop-shadow(0 0 4px rgba(0,0,0,0.05)); }
+  .chartCenter { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; pointer-events: none; text-align: center; }
+  .chartCenter .ratio { font-size: 34px; font-weight: 900; letter-spacing: 1px; margin-bottom: 2px; color: var(--text); text-shadow: 0 2px 10px var(--shadow); }
+  .chartCenter .small { font-size: 13px; font-weight: 700; color: var(--muted); }
+  
+  .legend { flex: 1 1 240px; min-width: 240px; border-radius: 20px; border: 1px solid var(--border); background: var(--out); padding: 20px; display: flex; flex-direction: column; justify-content: center; box-shadow: inset 0 2px 10px var(--shadow); }
+  .legend h3 { margin: 0 0 12px 0; font-size: 15px; color: var(--muted); font-weight: 800; text-transform: uppercase; letter-spacing: 1px; }
+  .row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 12px 16px; border-radius: 14px; background: var(--card); border: 1px solid var(--border); margin: 6px 0; box-shadow: 0 4px 10px var(--shadow); transition: transform 0.2s ease; }
+  .row:hover { transform: scale(1.02); }
+  .left { display: flex; align-items: center; gap: 12px; font-weight: 800; font-size: 15px; }
+  .dot { width: 14px; height: 14px; border-radius: 999px; box-shadow: inset 0 2px 4px rgba(0,0,0,0.2), 0 0 0 3px var(--input); }
+  .pct { font-weight: 900; font-size: 18px; white-space: nowrap; }
+
+  .toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%) translateY(20px); background: var(--text); border: none; color: var(--bg); padding: 12px 24px; border-radius: 999px; box-shadow: 0 15px 30px rgba(0,0,0,0.2); opacity: 0; pointer-events: none; transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); z-index: 9999; font-size: 15px; font-weight: 700; }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  .smartBox { margin-top: 20px; padding: 20px; border-radius: 20px; background: linear-gradient(145deg, rgba(124, 92, 255, 0.08), rgba(43, 180, 255, 0.08)); border: 1px solid rgba(124, 92, 255, 0.3); text-align: start; line-height: 1.7; box-shadow: inset 0 0 20px rgba(124, 92, 255, 0.05); }
+  .smartBox h3 { margin: 0 0 8px 0; font-size: 18px; font-weight: 800; color: #7c5cff; }
+  .dark .smartBox h3 { color: #a48cff; }
+  .smartBox .muted { font-size: 14px; margin-bottom: 14px; font-weight: 500; }
+  .smartGrid { display: grid; grid-template-columns: 1fr; gap: 12px; margin-bottom: 16px; }
+  .smartBox .pill { background: var(--card); border: 1px solid rgba(124, 92, 255, 0.2); padding: 10px 16px; font-size: 14px; justify-content: flex-start; }
+  .smartWhyText { margin-top: 10px; font-size: 14px; font-weight: 500; }
+  .smartWhyText ul { margin: 8px 0; padding-inline-start: 24px; }
+  .smartWhyText li { margin-bottom: 6px; }
+
+  /* ===== قسم VIP ===== */
+  .ai-key-section { margin-bottom: 14px; border-radius: 18px; border: 1.5px solid var(--border); overflow: hidden; background: var(--card); transition: border-color 0.4s, box-shadow 0.4s; }
+  .ai-key-section.vip-active { border-color: #f59e0b; box-shadow: 0 0 0 3px rgba(245,158,11,0.12), 0 8px 24px rgba(245,158,11,0.12); }
+  .ai-status-bar { display: flex; align-items: center; gap: 12px; padding: 13px 16px; cursor: pointer; user-select: none; background: var(--input); transition: background 0.3s; position: relative; overflow: hidden; }
+  .ai-key-section.vip-active .ai-status-bar { background: linear-gradient(135deg, rgba(245,158,11,0.13), rgba(217,119,6,0.07)); }
+  .ai-status-bar::before { content: ''; position: absolute; inset: 0; background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.06) 50%, transparent 100%); transform: translateX(-100%); transition: none; pointer-events: none; }
+  .ai-key-section.vip-active .ai-status-bar::before { animation: vipShimmer 3s ease-in-out infinite; }
+  @keyframes vipShimmer { 0%{transform:translateX(-100%)} 50%{transform:translateX(100%)} 100%{transform:translateX(100%)} }
+  .vip-icon-wrap { width: 42px; height: 42px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 20px; background: var(--bg); border: 1.5px solid var(--border); flex-shrink: 0; transition: all 0.3s; }
+  .ai-key-section.vip-active .vip-icon-wrap { background: linear-gradient(135deg, #fbbf24, #d97706); border-color: transparent; box-shadow: 0 4px 12px rgba(245,158,11,0.35); }
+  .ai-status-info { flex: 1; min-width: 0; }
+  .ai-status-title { font-size: 14px; font-weight: 900; color: var(--text); line-height: 1.3; transition: color 0.3s; }
+  .ai-key-section.vip-active .ai-status-title { background: linear-gradient(90deg,#f59e0b,#d97706); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+  .ai-status-sub { font-size: 11px; font-weight: 600; color: var(--muted); margin-top: 2px; transition: color 0.3s; }
+  .ai-key-section.vip-active .ai-status-sub { color: #b45309; }
+  .dark .ai-key-section.vip-active .ai-status-sub { color: #fcd34d; }
+  .ai-gear-btn { background: none; border: none; cursor: pointer; font-size: 16px; padding: 4px; color: var(--muted); transition: transform 0.3s, color 0.3s; line-height: 1; border-radius: 8px; }
+  .ai-gear-btn:hover { color: var(--text); background: var(--border); }
+  .ai-gear-btn.open { transform: rotate(90deg); }
+  .ai-key-panel { padding: 14px 16px; border-top: 1px solid var(--border); display: none; flex-direction: column; gap: 10px; background: var(--out); }
+  .ai-key-panel.show { display: flex; }
+  .ai-key-row { display: flex; gap: 8px; align-items: center; }
+  .ai-key-row input[type="password"] { flex: 1; font-size: 13px; font-family: monospace; padding: 11px 14px; border-radius: 12px; border: 1.5px solid var(--border); background: var(--card); color: var(--text); direction: ltr; text-align: left; width: 100%; box-sizing: border-box; transition: border-color 0.2s, box-shadow 0.2s; }
+  .ai-key-row input[type="password"]:focus { outline: none; border-color: #f59e0b; box-shadow: 0 0 0 3px rgba(245,158,11,0.18); }
+  .ai-save-btn { padding: 11px 18px; border-radius: 12px; border: none; background: linear-gradient(135deg,#f59e0b,#d97706); color: #1a0f00; font-size: 13px; font-weight: 900; cursor: pointer; font-family: inherit; white-space: nowrap; flex-shrink: 0; box-shadow: 0 4px 12px rgba(245,158,11,0.3); transition: all 0.2s; }
+  .ai-save-btn:hover { background: linear-gradient(135deg,#fbbf24,#f59e0b); transform: translateY(-2px); box-shadow: 0 6px 18px rgba(245,158,11,0.4); }
+  .ai-clear-btn { padding: 11px 13px; border-radius: 12px; border: 1px solid var(--border); background: var(--card); color: var(--muted); font-size: 14px; cursor: pointer; flex-shrink: 0; transition: all 0.2s; }
+  .ai-clear-btn:hover { background: var(--error-bg); color: var(--error-text); border-color: var(--error-border); transform: translateY(-1px); }
+  .ai-key-hint { font-size: 12px; color: var(--muted); font-weight: 600; display: flex; align-items: center; gap: 5px; }
+
+  /* ===== شريط الإعلان المتحرك ===== */
+  .news-ticker {
+    width: 100%;
+    overflow: hidden;
+    background: linear-gradient(90deg, #92400e, #d97706, #f59e0b, #d97706, #92400e);
+    background-size: 300% 100%;
+    animation: tickerBg 6s linear infinite;
+    border-radius: 14px;
+    margin-bottom: 18px;
+    position: relative;
+    z-index: 4;
+    box-shadow: 0 4px 18px var(--primary-glow), 0 2px 8px rgba(0,0,0,0.12);
+    border: 1px solid rgba(255,255,255,0.12);
+    display: flex;
+    align-items: stretch;
+    min-height: 40px;
+  }
+  .news-ticker-badge {
+    flex-shrink: 0;
+    padding: 0 14px;
+    font-size: 12px;
+    font-weight: 900;
+    color: #fff;
+    background: rgba(0,0,0,0.28);
+    display: flex;
+    align-items: center;
+    border-inline-end: 1.5px solid rgba(255,255,255,0.22);
+    white-space: nowrap;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    gap: 5px;
+  }
+  .news-ticker-track {
+    flex: 1;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    padding: 9px 0;
+  }
+  .news-ticker-inner {
+    display: inline-flex;
+    white-space: nowrap;
+    animation: tickerScroll 32s linear infinite;
+    -webkit-animation: tickerScroll 32s linear infinite;
+    direction: ltr;
+    pointer-events: none;
+    will-change: transform;
+    transform: translateZ(0);
+    -webkit-transform: translateZ(0);
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
+  }
+  .news-ticker-text {
+    font-size: 13.5px;
+    font-weight: 800;
+    color: #fff;
+    padding: 0 70px;
+    letter-spacing: 0.3px;
+    text-shadow: 0 1px 6px rgba(0,0,0,0.35);
+    user-select: none;
+    -webkit-user-select: none;
+  }
+  @keyframes tickerScroll {
+    0%   { transform: translateZ(0) translateX(80vw); }
+    100% { transform: translateZ(0) translateX(-100%); }
+  }
+  @-webkit-keyframes tickerScroll {
+    0%   { -webkit-transform: translateZ(0) translateX(80vw); }
+    100% { -webkit-transform: translateZ(0) translateX(-100%); }
+  }
+  @keyframes tickerBg {
+    0%   { background-position: 0% 50%; }
+    100% { background-position: 300% 50%; }
+  }
+  .dark .news-ticker {
+    background: linear-gradient(90deg, #451a03, #92400e, #f59e0b, #92400e, #451a03);
+    background-size: 300% 100%;
+    box-shadow: 0 4px 22px rgba(245,158,11,0.35);
+  }
+
+  /* ===== معسكرات محفوظة ===== */
+  .camps-section { margin-bottom: 20px; border-radius: 18px; border: 1.5px solid var(--border); overflow: hidden; background: var(--card); transition: border-color 0.3s; }
+  .camps-header { display: flex; align-items: center; gap: 10px; padding: 12px 16px; cursor: pointer; user-select: none; background: var(--input); transition: background 0.2s; -webkit-tap-highlight-color: transparent; }
+  .camps-header:hover { background: var(--border); }
+  .camps-icon-wrap { width: 40px; height: 40px; border-radius: 12px; background: linear-gradient(135deg,#818cf8,#4f46e5); display: flex; align-items: center; justify-content: center; font-size: 19px; flex-shrink: 0; box-shadow: 0 4px 10px rgba(79,70,229,0.3); }
+  .camps-header-info { flex: 1; min-width: 0; }
+  .camps-header-title { font-size: 14px; font-weight: 900; color: var(--text); }
+  .camps-header-sub { font-size: 11px; font-weight: 600; color: var(--muted); margin-top: 2px; }
+  .camps-count-badge { font-size: 12px; font-weight: 800; color: #4f46e5; background: rgba(129,140,248,0.15); padding: 4px 11px; border-radius: 999px; border: 1px solid rgba(129,140,248,0.3); white-space: nowrap; flex-shrink: 0; }
+  .dark .camps-count-badge { color: #a5b4fc; background: rgba(129,140,248,0.12); border-color: rgba(129,140,248,0.25); }
+  .camps-arrow { font-size: 13px; color: var(--muted); transition: transform 0.3s; margin-inline-start: 4px; flex-shrink: 0; }
+  .camps-section.open .camps-arrow { transform: rotate(180deg); }
+  .camps-body { display: none; padding: 14px 16px 16px; border-top: 1px solid var(--border); background: var(--out); flex-direction: column; gap: 12px; }
+  .camps-section.open .camps-body { display: flex; }
+  .camps-save-row { display: flex; gap: 8px; }
+  .camps-name-input { flex: 1; font-size: 13px; padding: 10px 14px; border-radius: 12px; border: 1.5px solid var(--border); background: var(--card); color: var(--text); font-family: inherit; font-weight: 600; box-sizing: border-box; transition: border-color 0.2s, box-shadow 0.2s; }
+  .camps-name-input:focus { outline: none; border-color: #818cf8; box-shadow: 0 0 0 3px rgba(129,140,248,0.2); }
+  .camps-save-btn { padding: 10px 18px; border-radius: 12px; border: none; background: linear-gradient(135deg,#818cf8,#4f46e5); color: #fff; font-size: 13px; font-weight: 900; cursor: pointer; font-family: inherit; white-space: nowrap; flex-shrink: 0; box-shadow: 0 4px 12px rgba(79,70,229,0.3); transition: all 0.2s; }
+  .camps-save-btn:hover { background: linear-gradient(135deg,#a5b4fc,#6d28d9); transform: translateY(-2px); box-shadow: 0 6px 18px rgba(79,70,229,0.4); }
+  .camps-save-btn:active { transform: scale(0.97); }
+  .camps-list { display: flex; flex-direction: column; gap: 8px; }
+  .camps-empty { text-align: center; color: var(--muted); font-size: 13px; font-weight: 600; padding: 12px 0 4px; }
+  .camp-card { display: flex; align-items: center; gap: 10px; padding: 11px 14px; border-radius: 14px; background: var(--card); border: 1.5px solid var(--border); transition: all 0.22s ease; }
+  .camp-card:hover { border-color: rgba(129,140,248,0.5); box-shadow: 0 4px 14px rgba(79,70,229,0.1); transform: translateY(-1px); }
+  .camp-card-info { flex: 1; min-width: 0; }
+  .camp-card-name { font-size: 14px; font-weight: 900; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .camp-card-troops { font-size: 11px; color: var(--muted); font-weight: 600; margin-top: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .camp-load-btn { padding: 8px 13px; border-radius: 10px; border: none; background: linear-gradient(135deg,#818cf8,#4f46e5); color: #fff; font-size: 12px; font-weight: 800; cursor: pointer; font-family: inherit; flex-shrink: 0; box-shadow: 0 2px 8px rgba(79,70,229,0.25); transition: all 0.2s; white-space: nowrap; }
+  .camp-load-btn:hover { transform: translateY(-1px); box-shadow: 0 4px 14px rgba(79,70,229,0.35); }
+  .camp-del-btn { background: none; border: none; cursor: pointer; font-size: 17px; padding: 6px 7px; color: var(--muted); transition: all 0.2s; border-radius: 8px; flex-shrink: 0; line-height: 1; }
+  .camp-del-btn:hover { background: var(--error-bg); color: var(--error-text); }
+
+  /* ===== زر مسح الحقل ===== */
+  .input-clear-row { display: flex; justify-content: center; margin-top: 8px; }
+  .field-clear-btn {
+    display: inline-flex; align-items: center; gap: 5px;
+    background: none; border: 1px solid var(--border);
+    border-radius: 8px; padding: 5px 14px;
+    font-size: 11.5px; font-weight: 800;
+    color: var(--muted); cursor: pointer; font-family: inherit;
+    transition: all 0.2s; line-height: 1.3; letter-spacing: 0.3px;
+  }
+  .field-clear-btn:hover { background: var(--error-bg); color: var(--error-text); border-color: var(--error-border); transform: scale(1.05); }
+  .field-clear-btn:active { transform: scale(0.95); }
+
+</style>
+</head>
+
+<body>
+
+<div class="topbar">
+  <div class="langBtns" role="group" aria-label="Language">
+    <button class="langBtn" type="button" id="btn-ar" onclick="setLang('ar')">🇸🇦 العربية</button>
+    <button class="langBtn" type="button" id="btn-en" onclick="setLang('en')">🇺🇸 English</button>
+    <button class="langBtn" type="button" id="btn-pt" onclick="setLang('pt')">🇧🇷 Português</button>
+  </div>
+  <div class="toggles">
+    <button class="toggleBtn" type="button" id="darkBtn" onclick="toggleDark()">🌙 Dark</button>
+  </div>
+</div>
+
+<div class="hero-container">
+  <img src="camp.png" alt="Daly Camp" class="hero-image" onerror="this.style.display='none'">
+</div>
+
+<!-- الشعار الاحترافي -->
+<h2 id="title">
+  <span class="daly-text">Daly</span><span class="alpha-badge">ALPHA</span>
+</h2>
+
+<div class="muted" id="hint">
+  اكتب مثل: <span class="pill">360k</span> <span class="pill">1.1m</span>
+</div>
+
+<!-- ===== شريط الإعلان المتحرك ===== -->
+<div class="news-ticker" id="newsTicker">
+  <div class="news-ticker-badge" id="tickerBadge">📢 جديد</div>
+  <div class="news-ticker-track">
+    <div class="news-ticker-inner">
+      <span class="news-ticker-text" id="tickerText1">🚧 إضافة الصور قيد التطوير — سيتم رفع مستوى الذكاء الاصطناعي في أقرب وقت ممكن ✨</span>
+      <span class="news-ticker-text" id="tickerText2">🚧 إضافة الصور قيد التطوير — سيتم رفع مستوى الذكاء الاصطناعي في أقرب وقت ممكن ✨</span>
+      <span class="news-ticker-text" id="tickerText3">🚧 إضافة الصور قيد التطوير — سيتم رفع مستوى الذكاء الاصطناعي في أقرب وقت ممكن ✨</span>
+    </div>
+  </div>
+</div>
+
+<div class="box">
+  
+  <div class="loading-overlay" id="loadingOverlay">
+    <div class="spinner"></div>
+    <div id="loadingText" style="font-size: 16px; text-align:center;">🤖 جاري تحليل الأرقام بدقة عالية...</div>
+  </div>
+
+  <!-- منطقة رفع الصورة الجديدة -->
+  <div class="upload-section" id="uploadArea">
+    <div class="upload-label" id="uploadText">📷 رفع تقرير الاستطلاع</div>
+
+    <!-- قسم VIP -->
+    <div class="ai-key-section" id="aiKeySection">
+      <div class="ai-status-bar" onclick="toggleAiPanel()">
+        <div class="vip-icon-wrap" id="vipIconWrap">🔐</div>
+        <div class="ai-status-info">
+          <div class="ai-status-title" id="aiStatusTitle">دخول VIP</div>
+          <div class="ai-status-sub" id="aiStatusSub">ذكاء متقدم في قراءة الصور</div>
+        </div>
+        <button class="ai-gear-btn" id="aiGearBtn" type="button">⚙️</button>
+      </div>
+      <div class="ai-key-panel" id="aiKeyPanel">
+        <div class="ai-key-row">
+          <input type="password" id="geminiKeyInput" placeholder="🔑 أدخل مفتاح VIP..." autocomplete="off" dir="ltr">
+          <button class="ai-save-btn" id="aiSaveBtn" type="button" onclick="saveGeminiKey()">تفعيل</button>
+          <button class="ai-clear-btn" type="button" onclick="clearGeminiKey()">🗑️</button>
+        </div>
+        <div class="ai-key-hint" id="aiKeyHint">🌟 ذكاء متقدم في قراءة الصور — VIP</div>
+      </div>
+    </div>
+
+    <div class="upload-btns">
+      <!-- مكتبة الصور -->
+      <div class="upload-btn gallery">
+        <input type="file" id="imageInput" accept="image/*" onchange="handleImageUpload(event)">
+        <div class="upload-btn-icon">🖼️</div>
+        <div class="upload-btn-label" id="uploadLblGallery">مكتبة الصور</div>
+        <div class="upload-btn-sub" id="uploadSubGallery">اختر من ألبومك</div>
+      </div>
+
+      <!-- التقاط صورة -->
+      <div class="upload-btn camera">
+        <input type="file" accept="image/*" capture="environment" onchange="handleImageUpload(event)">
+        <div class="upload-btn-icon">📷</div>
+        <div class="upload-btn-label" id="uploadLblCamera">التقاط صورة</div>
+        <div class="upload-btn-sub" id="uploadSubCamera">افتح الكاميرا</div>
+      </div>
+
+      <!-- اختيار ملف -->
+      <div class="upload-btn file">
+        <input type="file" accept="image/*,.png,.jpg,.jpeg,.webp" onchange="handleImageUpload(event)">
+        <div class="upload-btn-icon">📁</div>
+        <div class="upload-btn-label" id="uploadLblFile">اختيار ملف</div>
+        <div class="upload-btn-sub" id="uploadSubFile">من الجهاز</div>
+      </div>
+
+    </div>
+
+    <!-- معاينة الصورة المرفوعة -->
+    <div class="upload-preview" id="uploadPreview">
+      <img class="upload-preview-thumb" id="uploadThumb" src="" alt="preview">
+      <div class="upload-preview-info">
+        <div class="upload-preview-name" id="uploadFileName">—</div>
+        <div class="upload-preview-size" id="uploadFileSize">—</div>
+      </div>
+      <button class="upload-preview-close" onclick="clearUpload()" title="إلغاء">✕</button>
+    </div>
+  </div>
+
+  <div class="inputs-container">
+    <div class="input-wrapper">
+      <label id="lblSni">
+        <img src="sniper.png" class="game-icon" alt="sniper" onerror="this.style.display='none'">
+        <span>قناص دالي</span>
+      </label>
+      <input id="enSni" type="text" placeholder="مثال: 360.0k" />
+      <div class="input-clear-row">
+        <button class="field-clear-btn" type="button" id="clearBtnSni" onclick="clearField('enSni')">✕ مسح</button>
+      </div>
+    </div>
+
+    <div class="input-wrapper">
+      <label id="lblInf">
+        <img src="fighter.png" class="game-icon" alt="fighter" onerror="this.style.display='none'">
+        <span>مقاتل دالي</span>
+      </label>
+      <input id="enInf" type="text" placeholder="مثال: 360.0k" />
+      <div class="input-clear-row">
+        <button class="field-clear-btn" type="button" id="clearBtnInf" onclick="clearField('enInf')">✕ مسح</button>
+      </div>
+    </div>
+
+    <div class="input-wrapper">
+      <label id="lblCav">
+        <img src="cavalry.png" class="game-icon" alt="cavalry" onerror="this.style.display='none'">
+        <span>جوال دالي</span>
+      </label>
+      <input id="enCav" type="text" placeholder="مثال: 1.1m" />
+      <div class="input-clear-row">
+        <button class="field-clear-btn" type="button" id="clearBtnCav" onclick="clearField('enCav')">✕ مسح</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== معسكرات محفوظة ===== -->
+  <div class="camps-section" id="campsSection">
+    <div class="camps-header" onclick="toggleCampsPanel()">
+      <div class="camps-icon-wrap">📁</div>
+      <div class="camps-header-info">
+        <div class="camps-header-title" id="campsSectionTitle">المعسكرات المحفوظة</div>
+        <div class="camps-header-sub" id="campsSectionSub">اضغط لحفظ وتحميل الأرقام</div>
+      </div>
+      <div class="camps-count-badge" id="campsCount">0</div>
+      <div class="camps-arrow">▾</div>
+    </div>
+    <div class="camps-body">
+      <div class="camps-save-row">
+        <input type="text" class="camps-name-input" id="campNameInput" placeholder="اسم المعسكر..." maxlength="30" onkeydown="if(event.key==='Enter')saveCurrentCamp()">
+        <button class="camps-save-btn" id="campSaveBtn" type="button" onclick="saveCurrentCamp()">💾 حفظ</button>
+      </div>
+      <div class="camps-list" id="campsList"></div>
+    </div>
+  </div>
+
+  <div class="actions">
+    <button class="primary" onclick="calc()" id="calcBtn">⚔️ اعطني أفضل نوعين + النسبة</button>
+    <button class="primary smart" onclick="smartAnalyze()" id="smartBtn">🧠 تحليل ذكي</button>
+    <button class="secondary" onclick="copyResult()" id="copyBtn">📋 نسخ النتيجة</button>
+    <button class="secondary" onclick="shareResult()" id="shareBtn">🔗 مشاركة</button>
+    <button class="secondary" onclick="resetAll()" id="resetBtn">♻️ إعادة ضبط</button>
+  </div>
+
+  <div id="out" class="out">ادخل الأرقام واضغط الزر.</div>
+  <div id="smartBox" class="smartBox" style="display:none"></div>
+  
+  <div class="chartWrap" id="chartWrap" style="display:none">
+    <div class="chartCard">
+      <canvas id="chart" width="220" height="220"></canvas>
+      <div class="chartCenter">
+        <div class="ratio" id="ratioText">70 / 30</div>
+        <div class="small" id="ratioHint">النسبة المثالية</div>
+      </div>
+    </div>
+    <div class="legend">
+      <h3 id="legendTitle">التوصية</h3>
+      <div class="row" id="rowA">
+        <div class="left">
+          <span class="dot" id="dotA"></span>
+          <img id="iconA" class="game-icon" src="sniper.png" alt="A" style="width:28px;height:28px" onerror="this.style.display='none'">
+          <span id="nameA">قناص</span>
+        </div>
+        <div class="pct" id="pctA">70%</div>
+      </div>
+      <div class="row" id="rowB">
+        <div class="left">
+          <span class="dot" id="dotB"></span>
+          <img id="iconB" class="game-icon" src="fighter.png" alt="B" style="width:28px;height:28px" onerror="this.style.display='none'">
+          <span id="nameB">مقاتل</span>
+        </div>
+        <div class="pct" id="pctB">30%</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="signature" id="sig">تم إنشاء هذا المساعد بواسطة <span>F11</span></div>
+
+<script>
+/* ================== دوال حماية المتصفحات ================== */
+function safeSetStorage(key, value) {
+  try { localStorage.setItem(key, value); } catch (e) { }
+}
+function safeGetStorage(key) {
+  try { return localStorage.getItem(key); } catch (e) { return null; }
+}
+
+/* ================== دالة إظهار الخطأ المدمجة ================== */
+function showSiteError(msg) {
+    const outEl = document.getElementById("out");
+    outEl.innerText = "❌ " + msg;
+    outEl.classList.add("error");
+    outEl.classList.remove("flash");
+    requestAnimationFrame(() => outEl.classList.add("flash"));
+    toast("❌ " + ((T[LANG] || T.ar).toastError || "حدث خطأ في القراءة"));
+    hideChart();
+    document.getElementById("smartBox").style.display = "none";
+}
+
+/* ================== دوال معاينة الصورة ================== */
+function showUploadPreview(file) {
+    const preview = document.getElementById("uploadPreview");
+    const thumb   = document.getElementById("uploadThumb");
+    const name    = document.getElementById("uploadFileName");
+    const size    = document.getElementById("uploadFileSize");
+    if (!preview) return;
+    const url = URL.createObjectURL(file);
+    thumb.src = url;
+    name.innerText = file.name.length > 28 ? file.name.substring(0,25)+"..." : file.name;
+    const kb = (file.size / 1024).toFixed(0);
+    size.innerText = kb > 1024 ? (kb/1024).toFixed(1)+" MB" : kb+" KB";
+    preview.classList.add("show");
+}
+function clearUpload() {
+    document.getElementById("uploadPreview").classList.remove("show");
+    document.getElementById("uploadThumb").src = "";
+    // reset all file inputs
+    document.querySelectorAll('.upload-btn input[type="file"]').forEach(i => i.value = "");
+}
+
+/* ================== قراءة الصورة بـ Tesseract OCR (بدون API key) ================== */
+
+/* ─── Otsu's Method: إيجاد أفضل عتبة ثنائية تلقائياً لكل صورة ─── */
+function otsuThreshold(gray) {
+    const hist = new Array(256).fill(0);
+    for (let i = 0; i < gray.length; i++) hist[gray[i]]++;
+    const total = gray.length;
+    let sum = 0;
+    for (let i = 0; i < 256; i++) sum += i * hist[i];
+    let sumB = 0, wB = 0, maxVar = 0, bestT = 128;
+    for (let t = 0; t < 256; t++) {
+        wB += hist[t];
+        if (wB === 0) continue;
+        const wF = total - wB;
+        if (wF === 0) break;
+        sumB += t * hist[t];
+        const v = wB * wF * Math.pow(sumB/wB - (sum-sumB)/wF, 2);
+        if (v > maxVar) { maxVar = v; bestT = t; }
+    }
+    return bestT;
+}
+
+/* ─── صورة بـ Otsu binarization (أنظف بكثير من CSS contrast) ─── */
+function makeOtsuImage(file, scale, cropTop, cropBottom) {
+    return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => {
+            const ct = cropTop || 0, cb = cropBottom || 1;
+            const sY = Math.floor(img.height * ct);
+            const sH = Math.floor(img.height * (cb - ct));
+            const W = Math.round(img.width * scale);
+            const H = Math.round(sH * scale);
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            canvas.width = W; canvas.height = H;
+            ctx.drawImage(img, 0, sY, img.width, sH, 0, 0, W, H);
+
+            const imgData = ctx.getImageData(0, 0, W, H);
+            const d = imgData.data;
+            const len = W * H;
+
+            // تحويل إلى رمادي
+            const gray = new Uint8Array(len);
+            for (let i = 0; i < len; i++)
+                gray[i] = Math.round(0.299*d[i*4] + 0.587*d[i*4+1] + 0.114*d[i*4+2]);
+
+            // Otsu threshold
+            const thr = otsuThreshold(gray);
+            console.log(`🎯 Otsu threshold=${thr} (crop ${ct}-${cb})`);
+
+            // تطبيق العتبة + عدّ البكسلات الداكنة
+            let darkCount = 0;
+            for (let i = 0; i < len; i++) {
+                const val = gray[i] > thr ? 255 : 0;
+                d[i*4] = d[i*4+1] = d[i*4+2] = val;
+                if (val === 0) darkCount++;
+            }
+
+            // قلب الألوان إذا الخلفية داكنة (نص فاتح على خلفية غامقة)
+            if (darkCount > len * 0.5) {
+                for (let i = 0; i < len; i++)
+                    d[i*4] = d[i*4+1] = d[i*4+2] = 255 - d[i*4];
+                console.log("🔄 Inverted (dark bg)");
+            }
+
+            ctx.putImageData(imgData, 0, 0);
+            canvas.toBlob(blob => { resolve(blob); URL.revokeObjectURL(img.src); }, 'image/png');
+        };
+        img.onerror = () => reject(new Error("فشل تحميل الصورة"));
+        img.src = URL.createObjectURL(file);
+    });
+}
+
+/* ─── صورة بفلتر CSS (grayscale + contrast) ─── */
+function makeFilterImage(file, scale, filterStr, cropTop, cropBottom) {
+    return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => {
+            const ct = cropTop || 0, cb = cropBottom || 1;
+            const sY = Math.floor(img.height * ct);
+            const sH = Math.floor(img.height * (cb - ct));
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            canvas.width  = Math.round(img.width * scale);
+            canvas.height = Math.round(sH * scale);
+            ctx.filter = filterStr;
+            ctx.drawImage(img, 0, sY, img.width, sH, 0, 0, canvas.width, canvas.height);
+            canvas.toBlob(blob => { resolve(blob); URL.revokeObjectURL(img.src); }, 'image/png');
+        };
+        img.onerror = () => reject(new Error("فشل تحميل الصورة"));
+        img.src = URL.createObjectURL(file);
+    });
+}
+
+/* ─── صورة مخصصة لرقم واحد (قص أفقي+عمودي + تباين + Otsu + حشوة) ─── */
+function makeNumberImage(file, scale, top, bottom, left, right) {
+    return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => {
+            const sX = Math.floor(img.width * (left || 0));
+            const sY = Math.floor(img.height * (top || 0));
+            const sW = Math.floor(img.width * ((right || 1) - (left || 0)));
+            const sH = Math.floor(img.height * ((bottom || 1) - (top || 0)));
+            if (sW < 5 || sH < 5) { resolve(null); return; }
+            const W = Math.round(sW * scale);
+            const H = Math.round(sH * scale);
+            const c1 = document.createElement('canvas');
+            const ctx = c1.getContext('2d');
+            c1.width = W; c1.height = H;
+            // تعزيز التباين قبل Otsu
+            ctx.filter = 'grayscale(1) contrast(2.5) brightness(1.1)';
+            ctx.drawImage(img, sX, sY, sW, sH, 0, 0, W, H);
+            ctx.filter = 'none';
+            // Otsu binarization
+            const imgData = ctx.getImageData(0, 0, W, H);
+            const d = imgData.data, len = W * H;
+            const gray = new Uint8Array(len);
+            for (let i = 0; i < len; i++)
+                gray[i] = Math.round(0.299*d[i*4] + 0.587*d[i*4+1] + 0.114*d[i*4+2]);
+            const thr = otsuThreshold(gray);
+            let darkCount = 0;
+            for (let i = 0; i < len; i++) {
+                const val = gray[i] > thr ? 255 : 0;
+                d[i*4] = d[i*4+1] = d[i*4+2] = val;
+                if (val === 0) darkCount++;
+            }
+            if (darkCount > len * 0.5) {
+                for (let i = 0; i < len; i++)
+                    d[i*4] = d[i*4+1] = d[i*4+2] = 255 - d[i*4];
+            }
+            ctx.putImageData(imgData, 0, 0);
+            // إضافة حشوة بيضاء (يساعد Tesseract على قراءة الحواف)
+            const pad = 30;
+            const c2 = document.createElement('canvas');
+            const p = c2.getContext('2d');
+            c2.width = W + pad*2; c2.height = H + pad*2;
+            p.fillStyle = '#fff';
+            p.fillRect(0, 0, c2.width, c2.height);
+            p.drawImage(c1, pad, pad);
+            c2.toBlob(blob => { resolve(blob); URL.revokeObjectURL(img.src); }, 'image/png');
+        };
+        img.onerror = () => reject(new Error("فشل تحميل الصورة"));
+        img.src = URL.createObjectURL(file);
+    });
+}
+
+/* ─── استخراج إجمالي القوات من النص (حول X.Xm) للتحقق ─── */
+function extractHeaderTotal(text) {
+    const m = text.match(/(?:حول|around|approximately|about|تقريب[اً]*)\s*(\d+\.?\d*)\s*([kKmM])/i);
+    if (m) return parseNum(m[1] + m[2]);
+    return 0;
+}
+
+/* ─── تنظيف نص كلمة OCR + تصحيح أخطاء شائعة ─── */
+function cleanTroopWord(raw) {
+    let t = (raw || "").trim();
+    // إزالة أسطر متعددة: أخذ أطول سطر يحتوي أرقام
+    if (t.includes('\n')) {
+        const lines = t.split('\n').map(l => l.trim()).filter(l => /\d/.test(l));
+        t = lines.sort((a, b) => b.length - a.length)[0] || t.split('\n')[0] || '';
+    }
+    t = t.replace(/\s/g, '');
+    // تصحيح أخطاء OCR الشائعة
+    t = t.replace(/[oO]/g, '0');
+    t = t.replace(/[lI|!]/g, '1');
+    t = t.replace(/[,;:]/g, '.');
+    t = t.replace(/[sS](?=[0-9])/g, '5');
+    t = t.replace(/[bB](?=\d)/g, '8');
+    t = t.toLowerCase();
+    // إزالة أحرف غير مطلوبة من البداية والنهاية
+    t = t.replace(/^[^0-9]+/, '');
+    t = t.replace(/[^0-9km.]+$/, '');
+    // إصلاح: نقاط متعددة → نقطة واحدة
+    t = t.replace(/\.{2,}/g, '.');
+    // مطابقة نمط القوات: رقم + k أو m
+    const m = t.match(/(\d+\.?\d*[km])/i);
+    if (m) return m[1];
+    // فقط أصفار
+    if (/^0+$/.test(t)) return '0';
+    // رقم بدون لاحقة (من OCR فردي) → إرجاعه إذا كان رقم صالح
+    const numOnly = t.match(/^(\d+\.?\d*)$/);
+    if (numOnly) {
+        const n = parseFloat(numOnly[1]);
+        if (n === 0) return '0';
+        // لا نعرف إذا k أو m، نرجع null
+    }
+    return null;
+}
+
+/* --- استخراج ذكي: باستخدام مواقع الكلمات (bbox) للعثور على 3 أرقام على نفس الصف --- */
+function extractTroopsFromWords(words, imgHeight) {
+    const troopWords = [];
+    for (const w of (words || [])) {
+        if ((w.confidence || 0) < 15) continue;
+        const cleaned = cleanTroopWord(w.text);
+        if (cleaned) {
+            troopWords.push({ ...w, cleanVal: cleaned });
+        }
+    }
+
+    if (troopWords.length < 2) return null;
+
+    troopWords.sort((a, b) => a.bbox.y0 - b.bbox.y0);
+
+    const yTol = Math.max(40, imgHeight * 0.04);
+    const rows = [];
+    let currentRow = [troopWords[0]];
+    for (let i = 1; i < troopWords.length; i++) {
+        if (Math.abs(troopWords[i].bbox.y0 - currentRow[0].bbox.y0) < yTol) {
+            currentRow.push(troopWords[i]);
+        } else {
+            rows.push(currentRow);
+            currentRow = [troopWords[i]];
+        }
+    }
+    rows.push(currentRow);
+
+    console.log("🔍 صفوف:", rows.map(r => r.map(w => w.cleanVal + '(' + Math.round(w.confidence) + ')')));
+
+    // 🏆 صف بـ 3 أرقام
+    let best = rows.find(r => r.length === 3);
+    // أو: صف بـ 2 رقم (الثالث = 0)
+    if (!best) best = rows.find(r => r.length === 2);
+    if (!best) return null;
+
+    // ترتيب من يسار لليمين = مقاتل ← قناص ← جوال
+    best.sort((a, b) => a.bbox.x0 - b.bbox.x0);
+    const vals = best.map(w => w.cleanVal);
+    while (vals.length < 3) vals.push('0');
+
+    return {
+        fighter: vals[0], sniper: vals[1], cavalry: vals[2],
+        words: best // نحفظ الكلمات الأصلية للثقة
+    };
+}
+
+/* --- استخراج احتياطي من النص الخام --- */
+function extractTroopsFromText(rawText) {
+    const text = rawText.toLowerCase().trim();
+    const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+
+    function isSummaryLine(line) {
+        return /حول|about|إجمالي|total|around|تقريب/i.test(line);
+    }
+
+    function numsFromLine(line) {
+        const result = [];
+        const pat = /(\d+\.?\d*\s*[km])|\b(0)\b/gi;
+        let m;
+        while ((m = pat.exec(line)) !== null) {
+            if (m[1]) result.push(m[1].replace(/\s/g, '').toLowerCase());
+            else result.push('0');
+        }
+        return result;
+    }
+
+    const filteredLines = lines.filter(l => !isSummaryLine(l));
+
+    let c = [];
+    for (const line of filteredLines) {
+        const nums = numsFromLine(line);
+        if (nums.length === 3) { c = nums; break; }
+    }
+    if (c.length < 3) {
+        for (const line of filteredLines) {
+            const nums = numsFromLine(line);
+            if (nums.length === 2 && nums.every(n => /[km]$/.test(n))) {
+                c = [...nums, "0"]; break;
+            }
+        }
+    }
+    if (c.length < 3) {
+        c = [];
+        for (const line of filteredLines) {
+            const nums = numsFromLine(line);
+            if (nums.length === 1 && /^\d+\.?\d*m$/.test(nums[0])) continue;
+            for (const n of nums) { c.push(n); if (c.length >= 3) break; }
+            if (c.length >= 3) break;
+        }
+    }
+    return { fighter: c[0]||"0", sniper: c[1]||"0", cavalry: c[2]||"0" };
+}
+
+/* --- تشغيل OCR مرة واحدة --- */
+async function runOCRPass(blob, params, logger) {
+    const worker = await Tesseract.createWorker('eng', 1, { logger });
+    if (params) await worker.setParameters(params);
+    const { data } = await worker.recognize(blob);
+    await worker.terminate();
+    return data;
+}
+
+/* --- استخراج القوات من نتيجة OCR --- */
+function extractFromData(data) {
+    const imgH = (data.words||[]).reduce((max, w) => Math.max(max, w.bbox.y1||0), 1);
+    return extractTroopsFromWords(data.words, imgH)
+        || extractTroopsFromText(data.text || "");
+}
+
+/* --- هل القيمة رقم قوات صالح (غير صفري)؟ --- */
+function isValidTroop(v) {
+    return /^\d+\.?\d*[km]$/i.test((v||"").toLowerCase());
+}
+
+/* --- تصويت بالإجماع: اختيار أفضل قيمة لكل حقل من عدة نتائج --- */
+function consensusVote(allParsed, allData) {
+    const fields = ['fighter', 'sniper', 'cavalry'];
+    const result = {};
+
+    for (const field of fields) {
+        const candidates = [];
+
+        for (let i = 0; i < allParsed.length; i++) {
+            const val = (allParsed[i]?.[field] || "0").toLowerCase();
+            if (!isValidTroop(val)) continue;
+
+            // حساب الثقة من كلمات OCR
+            let conf = 50;
+            const savedWords = allParsed[i]?.words;
+            if (savedWords) {
+                const matched = savedWords.find(w => w.cleanVal === val);
+                if (matched) conf = matched.confidence || 50;
+            }
+            if (!savedWords && allData[i]) {
+                const matched = (allData[i].words||[]).find(w => cleanTroopWord(w.text) === val);
+                if (matched) conf = matched.confidence || 50;
+            }
+
+            candidates.push({ val, conf, pass: i });
+        }
+
+        if (candidates.length === 0) {
+            result[field] = "0";
+            continue;
+        }
+
+        if (candidates.length === 1) {
+            result[field] = candidates[0].val;
+            continue;
+        }
+
+        // عدّ التكرارات: إذا 2+ تمريرات اتفقت → إجماع
+        const counts = {};
+        for (const c of candidates) {
+            counts[c.val] = (counts[c.val] || 0) + 1;
+        }
+
+        let majority = null;
+        let majorityCount = 0;
+        for (const [val, count] of Object.entries(counts)) {
+            if (count > majorityCount) {
+                majority = val;
+                majorityCount = count;
+            }
+        }
+
+        if (majorityCount >= 2) {
+            result[field] = majority;
+            console.log(`  ✅ ${field}: "${majority}" (إجماع ${majorityCount}/${candidates.length})`);
+        } else {
+            // لا إجماع → أعلى ثقة
+            candidates.sort((a, b) => b.conf - a.conf);
+            result[field] = candidates[0].val;
+            console.log(`  ⚖️ ${field}: "${candidates[0].val}" (أعلى ثقة ${Math.round(candidates[0].conf)}) من ${candidates.map(c=>'"'+c.val+'"').join(' vs ')}`);
+        }
+    }
+
+    return result;
+}
+
+/* ===== Gemini AI Vision ===== */
+function fileToBase64(file) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload  = () => resolve(reader.result.split(',')[1]);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+    });
+}
+
+/* كشف نوع الصورة من البيانات */
+function detectMime(file, base64) {
+    if (file.type && file.type.startsWith('image/')) return file.type;
+    const h = base64.substring(0, 12);
+    if (h.startsWith('/9j/'))   return 'image/jpeg';
+    if (h.startsWith('iVBOR')) return 'image/png';
+    if (h.startsWith('UklGR')) return 'image/webp';
+    return 'image/jpeg';
+}
+
+async function readImageWithGemini(file, apiKey) {
+    const base64   = await fileToBase64(file);
+    const mimeType = detectMime(file, base64);
+    const prompt   = `You are analyzing a strategy game scout report screenshot.
+Find these three troop numbers: Snipers (قناص), Fighters (مقاتل), Cavalry (جوال).
+Numbers format: 360k / 1.2m / 500.0k
+Respond with ONLY this JSON (no markdown, no explanation):
+{"sni":"360k","inf":"1.2m","cav":"500k"}
+Use "0" for any missing value.`;
+
+    /* نماذج مثبّتة تعمل مع الـ Free Tier */
+    const models = ['gemini-1.5-flash', 'gemini-1.5-pro'];
+
+    for (const model of models) {
+        try {
+            const resp = await fetch(
+                `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
+                {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        contents: [{ parts: [
+                            { text: prompt },
+                            { inline_data: { mime_type: mimeType, data: base64 } }
+                        ]}],
+                        generationConfig: { temperature: 0, maxOutputTokens: 200 },
+                        safetySettings: [
+                            { category: 'HARM_CATEGORY_HARASSMENT',        threshold: 'BLOCK_NONE' },
+                            { category: 'HARM_CATEGORY_HATE_SPEECH',       threshold: 'BLOCK_NONE' },
+                            { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_NONE' },
+                            { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_NONE' }
+                        ]
+                    })
+                }
+            );
+
+            const bodyText = await resp.text();
+            console.log(`📡 Gemini [${model}] status=${resp.status} →`, bodyText.substring(0, 400));
+
+            if (!resp.ok) {
+                let msg = `HTTP ${resp.status}`;
+                try { msg = JSON.parse(bodyText)?.error?.message || msg; } catch(_) {}
+                // مفتاح خاطئ → توقف فوراً
+                if (resp.status === 401 || resp.status === 403 || resp.status === 400) throw new Error('KEYERR:' + msg);
+                // نموذج غير موجود → جرّب التالي
+                if (resp.status === 404) { console.warn(`⚠️ ${model} غير موجود`); continue; }
+                throw new Error(msg);
+            }
+
+            const data = JSON.parse(bodyText);
+            const cand = data.candidates?.[0];
+
+            if (!cand || !cand.content) {
+                const reason = cand?.finishReason || 'UNKNOWN';
+                console.warn(`⚠️ Gemini [${model}] blocked: ${reason}`);
+                continue;
+            }
+
+            const text = (cand.content.parts?.[0]?.text || '').trim();
+            console.log(`✅ Gemini [${model}] text:`, text);
+
+            const m = text.match(/\{[\s\S]*?\}/);
+            if (!m) { console.warn('No JSON in response'); continue; }
+            return JSON.parse(m[0]);
+
+        } catch(e) {
+            const msg = e.message || '';
+            if (msg.startsWith('KEYERR:')) throw new Error(msg.replace('KEYERR:', ''));
+            console.error(`❌ Gemini [${model}]:`, msg);
+        }
+    }
+    throw new Error('تعذّر الاتصال بـ Gemini — تحقق من الـ Key أو الإنترنت');
+}
+
+function getGeminiKey()    { return safeGetStorage('F11_GEMINI_KEY') || ''; }
+
+async function saveGeminiKey() {
+    const t   = T[LANG] || T.ar;
+    const val = (document.getElementById('geminiKeyInput').value || '').trim();
+    if (!val.startsWith('AIza') || val.length < 20) { toast(t.vipBadKey || '❌ مفتاح غير صحيح'); return; }
+
+    // ── اختبار المفتاح قبل الحفظ ──
+    const btn = document.getElementById('aiSaveBtn');
+    btn.innerText = '⏳';
+    btn.disabled  = true;
+
+    try {
+        const resp = await fetch(
+            `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${val}`,
+            {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    contents: [{ parts: [{ text: 'reply with one word: OK' }] }],
+                    generationConfig: { maxOutputTokens: 5 }
+                })
+            }
+        );
+        const body = await resp.text();
+        if (!resp.ok) {
+            let msg = `HTTP ${resp.status}`;
+            try { msg = JSON.parse(body)?.error?.message || msg; } catch(_) {}
+            throw new Error(msg);
+        }
+        // ✅ الـ Key يعمل — احفظه
+        safeSetStorage('F11_GEMINI_KEY', val);
+        updateAiStatus();
+        document.getElementById('aiKeyPanel').classList.remove('show');
+        document.getElementById('aiGearBtn').classList.remove('open');
+        toast(t.vipSaved || '👑 VIP مفعّل!');
+    } catch(e) {
+        const msg = (e.message || '');
+        const detail = msg.length > 80 ? msg.substring(0, 80) + '…' : msg;
+        toast('❌ ' + detail);
+        console.error('VIP Key Test Failed:', msg);
+    } finally {
+        btn.innerText = t.vipSave || 'تفعيل';
+        btn.disabled  = false;
+    }
+}
+
+function clearGeminiKey() {
+    const t = T[LANG] || T.ar;
+    safeSetStorage('F11_GEMINI_KEY', '');
+    document.getElementById('geminiKeyInput').value = '';
+    updateAiStatus();
+    toast(t.vipCleared || '🗑️ تم الإلغاء');
+}
+
+function toggleAiPanel() {
+    const panel = document.getElementById('aiKeyPanel');
+    const btn   = document.getElementById('aiGearBtn');
+    const open  = panel.classList.contains('show');
+    panel.classList.toggle('show', !open);
+    btn.classList.toggle('open', !open);
+    if (!open) {
+        const k = getGeminiKey();
+        if (k) document.getElementById('geminiKeyInput').value = k;
+    }
+}
+
+function updateAiStatus() {
+    const key     = getGeminiKey();
+    const t       = T[LANG] || T.ar;
+    const section = document.getElementById('aiKeySection');
+    const iconW   = document.getElementById('vipIconWrap');
+    const title   = document.getElementById('aiStatusTitle');
+    const sub     = document.getElementById('aiStatusSub');
+    const inp     = document.getElementById('geminiKeyInput');
+    const saveBtn = document.getElementById('aiSaveBtn');
+    const hint    = document.getElementById('aiKeyHint');
+    if (!title) return;
+    // نص الـ placeholder وزر التفعيل والـ hint
+    if (inp)     inp.placeholder = t.vipPlaceholder || '🔑 VIP Key...';
+    if (saveBtn) saveBtn.innerText = t.vipSave || 'تفعيل';
+    if (hint)    hint.innerText = t.vipHint || '🌟 ذكاء متقدم في قراءة الصور — VIP';
+    if (key) {
+        section?.classList.add('vip-active');
+        if (iconW) iconW.innerText = '👑';
+        title.innerText = t.vipActive    || '👑 VIP مفعّل';
+        if (sub) sub.innerText = t.vipSubActive || '✨ Gemini يقرأ صورك بدقة عالية';
+    } else {
+        section?.classList.remove('vip-active');
+        if (iconW) iconW.innerText = '🔐';
+        title.innerText = t.vipInactive  || 'دخول VIP';
+        if (sub) sub.innerText = t.vipSub || 'ذكاء متقدم في قراءة الصور';
+    }
+}
+
+/* ============== الدالة الرئيسية لرفع الصورة (قراءة كل رقم على حدة + مقارنة) ============== */
+async function handleImageUpload(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    showUploadPreview(file);
+    document.getElementById("out").classList.remove("error");
+
+    const overlay  = document.getElementById("loadingOverlay");
+    const loadText = document.getElementById("loadingText");
+    overlay.style.display = "flex";
+
+    // ── Gemini AI أولاً (إن وُجد Key) ──
+    const geminiKey = getGeminiKey();
+    if (geminiKey) {
+        try {
+            if (loadText) loadText.innerText = (T[LANG]||T.ar).vipLoading || "✨ Gemini AI يقرأ الصورة...";
+            const aiResult = await readImageWithGemini(file, geminiKey);
+            const isOK = v => /^\d+\.?\d*[km]$|^0$/.test((v||'').toLowerCase());
+            const inf  = (aiResult.inf || aiResult.fighter || "0").toLowerCase();
+            const sni  = (aiResult.sni || aiResult.sniper  || "0").toLowerCase();
+            const cav  = (aiResult.cav || aiResult.cavalry || "0").toLowerCase();
+            if ([inf, sni, cav].some(isOK)) {
+                document.getElementById("enInf").value = isOK(inf) ? inf : "0";
+                document.getElementById("enSni").value = isOK(sni) ? sni : "0";
+                document.getElementById("enCav").value = isOK(cav) ? cav : "0";
+                toast(`✨ AI: ${inf} · ${sni} · ${cav}`);
+                overlay.style.display = "none";
+                document.querySelectorAll('.upload-btn input[type="file"]').forEach(i => i.value = "");
+                setTimeout(() => smartAnalyze(), 400);
+                return;
+            }
+            toast("⚠️ Gemini لم يجد أرقاماً كافية، جاري المحاولة بالطريقة العادية...");
+        } catch(gemErr) {
+            const errMsg = gemErr.message || '';
+            console.warn("⚠️ Gemini فشل:", errMsg);
+            const isKeyErr = /403|401|API key|invalid|not valid|permission/i.test(errMsg);
+            const isNet    = /fetch|network|Failed to fetch|NetworkError/i.test(errMsg);
+            if (isKeyErr)     toast("❌ مفتاح VIP غير صحيح — اضغط ⚙️ وأدخله من جديد");
+            else if (isNet)   toast("❌ تحقق من الاتصال بالإنترنت");
+            else               toast("⚠️ Gemini: " + errMsg.substring(0, 60));
+        }
+    }
+
+    // ── Tesseract كبديل احتياطي ──
+    try {
+        if (typeof Tesseract === "undefined") {
+            throw new Error("مكتبة OCR لم تُحمَّل. تحقق من اتصال الإنترنت وأعد تحميل الصفحة.");
+        }
+
+        // ① تجهيز الصور: صورة كاملة + 3 صور لكل رقم على حدة
+        if (loadText) loadText.innerText = "🖼️ تحسين الصورة...";
+        const [imgFull, imgL, imgM, imgR] = await Promise.all([
+            makeOtsuImage(file, 3),
+            makeNumberImage(file, 4, 0.30, 0.80, 0.00, 0.37),
+            makeNumberImage(file, 4, 0.30, 0.80, 0.30, 0.70),
+            makeNumberImage(file, 4, 0.30, 0.80, 0.63, 1.00)
+        ]);
+
+        // ② قراءة OCR: صورة كاملة + 3 أرقام بالتوازي
+        if (loadText) loadText.innerText = "🔍 قراءة القوات...";
+        const numParams = {
+            tessedit_char_whitelist: '0123456789.kKmM ',
+            tessedit_pageseg_mode: '7'
+        };
+        const [dataFull, dL, dM, dR] = await Promise.all([
+            runOCRPass(imgFull, { tessedit_pageseg_mode: '11' }, m => {
+                if (m.status === 'recognizing text' && loadText)
+                    loadText.innerText = `🔍 ${Math.round((m.progress||0)*100)}%`;
+            }),
+            runOCRPass(imgL, numParams, ()=>{}),
+            runOCRPass(imgM, numParams, ()=>{}),
+            runOCRPass(imgR, numParams, ()=>{})
+        ]);
+
+        console.log("═══════════════════════════════════════");
+        console.log("🔍 Full OCR:", dataFull.text.substring(0, 300));
+        console.log("🔍 Left:", dL.text.trim(), "| Center:", dM.text.trim(), "| Right:", dR.text.trim());
+        console.log("═══════════════════════════════════════");
+
+        // ③ استخراج القوات
+        const parsedFull = extractFromData(dataFull);
+        const perNum = {
+            fighter: cleanTroopWord(dL.text) || '0',
+            sniper:  cleanTroopWord(dM.text) || '0',
+            cavalry: cleanTroopWord(dR.text) || '0'
+        };
+        const headerTotal = extractHeaderTotal(dataFull.text);
+
+        console.log("📊 Full:", JSON.stringify(parsedFull));
+        console.log("📊 Per-number:", JSON.stringify(perNum));
+        console.log("📊 Header total:", headerTotal);
+
+        // ④ تقييم ومقارنة النتائج
+        if (loadText) loadText.innerText = "🧠 مقارنة النتائج...";
+
+        function scoreResult(r) {
+            let s = 0;
+            const vals = [r?.fighter||'0', r?.sniper||'0', r?.cavalry||'0'];
+            for (const v of vals) {
+                if (isValidTroop(v)) s += 3;
+                else if (v === '0') s += 1;
+            }
+            if (headerTotal > 0) {
+                const sum = vals.reduce((a, v) => a + parseNum(v), 0);
+                if (sum > 0) {
+                    const ratio = sum / headerTotal;
+                    if (ratio > 0.85 && ratio < 1.15) s += 5;
+                    else if (ratio > 0.7 && ratio < 1.3) s += 2;
+                }
+            }
+            return s;
+        }
+
+        const sFull = scoreResult(parsedFull);
+        const sPerN = scoreResult(perNum);
+        console.log(`📊 Scores: full=${sFull}, perNum=${sPerN}`);
+
+        // دمج النتائج: اختيار الأفضل لكل حقل
+        let final = {};
+        for (const f of ['fighter','sniper','cavalry']) {
+            const pv = (perNum[f] || '0').toLowerCase();
+            const fv = (parsedFull?.[f] || '0').toLowerCase();
+            if (sPerN > sFull + 2) final[f] = pv;
+            else if (sFull > sPerN + 2) final[f] = fv;
+            else if (isValidTroop(pv) && !isValidTroop(fv)) final[f] = pv;
+            else if (!isValidTroop(pv) && isValidTroop(fv)) final[f] = fv;
+            else if (pv === fv) final[f] = pv;
+            else final[f] = sPerN >= sFull ? pv : fv;
+        }
+
+        // ⑤ طوارئ: إعادة محاولة بقص مختلف إذا لم نجد أرقام كافية
+        let validNow = [final.fighter, final.sniper, final.cavalry]
+            .filter(v => isValidTroop(v)).length;
+
+        if (validNow < 1) {
+            console.log("⚠️ محاولة طوارئ بقص مختلف...");
+            if (loadText) loadText.innerText = "🔄 محاولة إضافية...";
+            const [eL, eM, eR] = await Promise.all([
+                makeNumberImage(file, 5, 0.38, 0.72, 0.00, 0.35),
+                makeNumberImage(file, 5, 0.38, 0.72, 0.33, 0.68),
+                makeNumberImage(file, 5, 0.38, 0.72, 0.65, 1.00)
+            ]);
+            const eP = { tessedit_char_whitelist: '0123456789.kKmM', tessedit_pageseg_mode: '8' };
+            const [edL, edM, edR] = await Promise.all([
+                runOCRPass(eL, eP, ()=>{}),
+                runOCRPass(eM, eP, ()=>{}),
+                runOCRPass(eR, eP, ()=>{})
+            ]);
+            const emergency = {
+                fighter: cleanTroopWord(edL.text) || final.fighter || '0',
+                sniper:  cleanTroopWord(edM.text) || final.sniper || '0',
+                cavalry: cleanTroopWord(edR.text) || final.cavalry || '0'
+            };
+            console.log("📊 Emergency:", JSON.stringify(emergency));
+            if (scoreResult(emergency) > scoreResult(final)) final = emergency;
+        }
+
+        console.log("🏆 النتيجة النهائية:", JSON.stringify(final));
+
+        const inf = (final.fighter || "0").toLowerCase();
+        const sni = (final.sniper  || "0").toLowerCase();
+        const cav = (final.cavalry || "0").toLowerCase();
+
+        const isOK = v => /^\d+\.?\d*[km]$|^0$/.test(v);
+        if (![inf, sni, cav].some(isOK)) {
+            throw new Error("لم يتمكن OCR من قراءة أرقام القوات. جرب صورة أوضح أو أدخل يدوياً.");
+        }
+
+        document.getElementById("enInf").value = isOK(inf) ? inf : "0";
+        document.getElementById("enSni").value = isOK(sni) ? sni : "0";
+        document.getElementById("enCav").value = isOK(cav) ? cav : "0";
+
+        toast(`✅ ${inf} · ${sni} · ${cav}`);
+        setTimeout(() => smartAnalyze(), 400);
+
+    } catch(err) {
+        console.error("❌ خطأ OCR:", err);
+        showSiteError(err.message || "حدث خطأ في قراءة الصورة.");
+    } finally {
+        overlay.style.display = "none";
+        document.querySelectorAll('.upload-btn input[type="file"]').forEach(i => i.value = "");
+    }
+}
+
+/* ================== معسكرات محفوظة ================== */
+const CAMPS_KEY = 'F11_SAVED_CAMPS';
+
+function getSavedCamps() {
+    try { return JSON.parse(safeGetStorage(CAMPS_KEY) || '[]'); }
+    catch(e) { return []; }
+}
+function setSavedCamps(camps) {
+    safeSetStorage(CAMPS_KEY, JSON.stringify(camps));
+}
+
+function escapeHtml(str) {
+    return (str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function toggleCampsPanel() {
+    document.getElementById('campsSection').classList.toggle('open');
+}
+
+function saveCurrentCamp() {
+    const t = T[LANG] || T.ar;
+    const name = (document.getElementById('campNameInput').value || '').trim();
+    if (!name) {
+        toast(t.campNoName || '⚠️ أدخل اسم المعسكر');
+        document.getElementById('campNameInput').focus();
+        return;
+    }
+    const sni = document.getElementById('enSni').value.trim();
+    const inf = document.getElementById('enInf').value.trim();
+    const cav = document.getElementById('enCav').value.trim();
+    if (!sni && !inf && !cav) {
+        toast(t.campNoTroops || '⚠️ أدخل أرقام القوات أولاً');
+        return;
+    }
+    const camps = getSavedCamps();
+    // إذا وُجد معسكر بنفس الاسم → حدّثه
+    const existIdx = camps.findIndex(c => c.name === name);
+    if (existIdx >= 0) {
+        camps[existIdx] = { name, sni, inf, cav };
+        toast(t.campUpdated || '✅ تم التحديث');
+    } else {
+        camps.unshift({ name, sni, inf, cav });
+        toast(t.campSaved || '💾 تم الحفظ!');
+    }
+    setSavedCamps(camps);
+    document.getElementById('campNameInput').value = '';
+    renderCamps();
+}
+
+function loadCamp(idx) {
+    const t = T[LANG] || T.ar;
+    const camps = getSavedCamps();
+    const camp = camps[idx];
+    if (!camp) return;
+    document.getElementById('enSni').value = camp.sni || '';
+    document.getElementById('enInf').value = camp.inf || '';
+    document.getElementById('enCav').value = camp.cav || '';
+    toast(`⚡ ${camp.name}`);
+    setTimeout(() => smartAnalyze(), 300);
+}
+
+function deleteCamp(idx) {
+    const t = T[LANG] || T.ar;
+    const camps = getSavedCamps();
+    if (idx < 0 || idx >= camps.length) return;
+    const name = camps[idx].name;
+    camps.splice(idx, 1);
+    setSavedCamps(camps);
+    renderCamps();
+    toast(`🗑️ ${name}`);
+}
+
+function renderCamps() {
+    const t = T[LANG] || T.ar;
+    const camps = getSavedCamps();
+
+    // تحديث العداد
+    const countEl = document.getElementById('campsCount');
+    if (countEl) countEl.innerText = camps.length;
+
+    // تحديث النصوص
+    const titleEl = document.getElementById('campsSectionTitle');
+    const subEl   = document.getElementById('campsSectionSub');
+    const phEl    = document.getElementById('campNameInput');
+    const btnEl   = document.getElementById('campSaveBtn');
+    if (titleEl) titleEl.innerText = t.campsSectionTitle || 'المعسكرات المحفوظة';
+    if (subEl)   subEl.innerText   = t.campsSectionSub   || 'اضغط لحفظ وتحميل الأرقام';
+    if (phEl)    phEl.placeholder  = t.campNamePh        || 'اسم المعسكر...';
+    if (btnEl)   btnEl.innerHTML   = `💾 ${t.campSave || 'حفظ'}`;
+
+    const list = document.getElementById('campsList');
+    if (!list) return;
+    if (camps.length === 0) {
+        list.innerHTML = `<div class="camps-empty">${t.campsEmpty || '📭 لا توجد معسكرات محفوظة'}</div>`;
+        return;
+    }
+    list.innerHTML = camps.map((camp, idx) => `
+        <div class="camp-card">
+            <div class="camp-card-info">
+                <div class="camp-card-name">🏕️ ${escapeHtml(camp.name)}</div>
+                <div class="camp-card-troops">${t.sni||'قناص'}: ${escapeHtml(camp.sni||'—')} &nbsp;·&nbsp; ${t.inf||'مقاتل'}: ${escapeHtml(camp.inf||'—')} &nbsp;·&nbsp; ${t.cav||'جوال'}: ${escapeHtml(camp.cav||'—')}</div>
+            </div>
+            <button class="camp-load-btn" type="button" onclick="loadCamp(${idx})">⚡ ${t.campLoad||'تحميل'}</button>
+            <button class="camp-del-btn" type="button" onclick="deleteCamp(${idx})" title="${t.campDelTitle||'حذف'}">🗑️</button>
+        </div>
+    `).join('');
+}
+
+/* ================== الترجمات ================== */
+const T = {
+  ar: {
+    title: "<span class='daly-text'>Daly</span><span class='alpha-badge'>ALPHA</span>",
+    hintPrefix: "اكتب مثل:",
+    lblSni: "قناص دالي",
+    lblInf: "مقاتل دالي",
+    lblCav: "جوال دالي",
+    phSni: "مثال: 360.0k",
+    phInf: "مثال: 360.0k",
+    phCav: "مثال: 1.1m",
+    btn: "⚔️ اعطني أفضل نوعين + النسبة",
+    copy: "📋 نسخ النتيجة",
+    copied: "✅ تم النسخ!",
+    outIdle: "ادخل الأرقام واضغط الزر.",
+    err: "أدخل قوات دالي أولاً.",
+    headerEnemy: "📌 دالي:",
+    sni: "قناص",
+    inf: "مقاتل",
+    cav: "جوال",
+    bestLine: "✅ الأفضل للهجوم:",
+    best: "✅ أفضل نوعين للهجوم:",
+    reason1: "سبب سريع:",
+    reason2: "أكبر نوع عند دالي هو",
+    reason3: "→ أفضل كونتر له هو",
+    reason4: "ونضيف",
+    reason5: "لأنه يعالج النوع الذي يقيد",
+    sig: "تم إنشاء هذا المساعد بواسطة",
+    dark: "🌙 داكن",
+    light: "☀️ فاتح",
+    share: '🔗 مشاركة',
+    shared: '✅ تم إنشاء رابط!',
+    reset: '♻️ إعادة ضبط',
+    ratioHint: 'النسبة المثالية',
+    legendTitle: 'التوصية',
+    toastReset: 'تمت إعادة الضبط',
+    toastNeed: 'أدخل قوات دالي أولاً.',
+    toastError: 'حدث خطأ في القراءة',
+    enterHint: "الرجاء إدخال قوات دالي أولاً.",
+    smartTitle: "تحليل ذكي",
+    smartSub: "نظرة متعمقة على التشكيلة للحصول على أفضل النتائج",
+    smartEnemy: "قوات العدو",
+    smartRec: "التوصية الذكية",
+    smartWhy: "لماذا هذا الاختيار؟",
+    smartWhy1: "هو أفضل مضاد لـ",
+    smartWhy2: "العدو يمتلك نسبة من",
+    smartWhy3: "لذا نضيف",
+    smartWhy4: "لا توجد تهديدات ثانوية كبيرة من العدو تتطلب تغطية مكثفة.",
+    smartWhy5: "النسبة المثالية بناءً على الحسبة هي",
+    smartNote: "ملاحظة: هذه النسب تعتمد على تحليل رياضي لتقليل خسائرك للحد الأدنى.",
+    uploadText: "📷 رفع تقرير الاستطلاع",
+    uploadLblGallery: "مكتبة الصور", uploadSubGallery: "اختر من ألبومك",
+    uploadLblCamera: "التقاط صورة",  uploadSubCamera: "افتح الكاميرا",
+    uploadLblFile: "اختيار ملف",     uploadSubFile: "من الجهاز",
+    loadingText: "🤖 جاري تحليل التقرير بدقة...",
+    ocrFail: "الرجاء التأكد أن الصورة لتقرير الاستطلاع، وتكون الأرقام واضحة.",
+    tickerBadge: "📢 جديد",
+    tickerMsg: "🚧 إضافة الصور قيد التطوير — سيتم رفع مستوى الذكاء الاصطناعي في أقرب وقت ممكن ✨",
+    vipInactive: "دخول VIP", vipActive: "👑 VIP مفعّل",
+    vipSub: "ذكاء متقدم في قراءة الصور", vipSubActive: "✨ Gemini يقرأ صورك بدقة عالية",
+    vipPlaceholder: "🔑 أدخل مفتاح VIP...", vipHint: "🌟 ذكاء متقدم في قراءة الصور — VIP",
+    vipSave: "تفعيل", vipSaved: "👑 تم تفعيل VIP بنجاح!", vipBadKey: "❌ مفتاح VIP غير صحيح",
+    vipCleared: "🗑️ تم إلغاء VIP", vipLoading: "✨ Gemini AI يقرأ الصورة...",
+    campsSectionTitle: "المعسكرات المحفوظة", campsSectionSub: "احفظ الأرقام وحمّلها بنقرة",
+    campNamePh: "اسم المعسكر...", campSave: "حفظ", campLoad: "تحميل",
+    campNoName: "⚠️ أدخل اسم المعسكر", campNoTroops: "⚠️ أدخل أرقام القوات أولاً",
+    campSaved: "💾 تم الحفظ!", campUpdated: "✅ تم تحديث المعسكر",
+    campsEmpty: "📭 لا توجد معسكرات محفوظة", campDelTitle: "حذف",
+    clearBtn: "✕ مسح"
+  },
+  en: {
+    title: "<span class='daly-text'>Daly</span><span class='alpha-badge'>ALPHA</span>",
+    hintPrefix: "Type like:",
+    lblSni: "Daly Snipers",
+    lblInf: "Daly Fighters",
+    lblCav: "Daly Cavalry",
+    phSni: "e.g. 360k",
+    phInf: "e.g. 360k",
+    phCav: "e.g. 1.1m",
+    btn: "⚔️ Get best two types + ratio",
+    copy: "📋 Copy result",
+    copied: "✅ Copied!",
+    outIdle: "Enter numbers and press the button.",
+    err: "Please enter Daly camp troops first.",
+    headerEnemy: "📌 Daly Camp:",
+    sni: "Snipers",
+    inf: "Fighters",
+    cav: "Cavalry",
+    bestLine: "✅ Best attack:",
+    best: "✅ Best two types to attack:",
+    reason1: "Quick reason:",
+    reason2: "Largest enemy type is",
+    reason3: "→ best counter is",
+    reason4: "We add",
+    reason5: "because it counters the type that beats",
+    sig: "This helper was created by",
+    dark: "🌙 Dark",
+    light: "☀️ Light",
+    share: '🔗 Share',
+    shared: '✅ Link ready!',
+    reset: '♻️ Reset',
+    ratioHint: 'Ideal ratio',
+    legendTitle: 'Recommendation',
+    toastReset: 'Reset done',
+    toastNeed: 'Enter Daly troops first.',
+    toastError: 'Failed to read image',
+    enterHint: "Please enter Daly troops first.",
+    smartTitle: "Smart Analysis",
+    smartSub: "In-depth look at the formation for best results",
+    smartEnemy: "Enemy Troops",
+    smartRec: "Smart Recommendation",
+    smartWhy: "Why this choice?",
+    smartWhy1: "is the best counter to",
+    smartWhy2: "The enemy has a good portion of",
+    smartWhy3: "so we add",
+    smartWhy4: "There are no major secondary threats requiring heavy coverage.",
+    smartWhy5: "The ideal calculated ratio is",
+    smartNote: "Note: These ratios are based on mathematical analysis to minimize your losses.",
+    uploadText: "📷 Upload Scout Report",
+    uploadLblGallery: "Gallery",       uploadSubGallery: "From your album",
+    uploadLblCamera: "Camera",         uploadSubCamera: "Take a photo",
+    uploadLblFile: "Browse File",      uploadSubFile: "From device",
+    loadingText: "🤖 Analyzing screenshot accurately...",
+    ocrFail: "Please ensure the image is a clear scout report.",
+    tickerBadge: "📢 NEWS",
+    tickerMsg: "🚧 AI image upload is under development — Enhanced AI coming very soon ✨",
+    vipInactive: "VIP Access", vipActive: "👑 VIP Active",
+    vipSub: "Advanced AI image reading", vipSubActive: "✨ Gemini reads your images with high accuracy",
+    vipPlaceholder: "🔑 Enter VIP Key...", vipHint: "🌟 Advanced AI Vision — VIP",
+    vipSave: "Activate", vipSaved: "👑 VIP Activated!", vipBadKey: "❌ Invalid VIP Key",
+    vipCleared: "🗑️ VIP Removed", vipLoading: "✨ Gemini AI is reading the image...",
+    campsSectionTitle: "Saved Camps", campsSectionSub: "Save & load troop numbers instantly",
+    campNamePh: "Camp name...", campSave: "Save", campLoad: "Load",
+    campNoName: "⚠️ Enter a camp name", campNoTroops: "⚠️ Enter troop numbers first",
+    campSaved: "💾 Camp saved!", campUpdated: "✅ Camp updated",
+    campsEmpty: "📭 No saved camps yet", campDelTitle: "Delete",
+    clearBtn: "✕ Clear"
+  },
+  pt: {
+    title: "<span class='daly-text'>Daly</span><span class='alpha-badge'>ALPHA</span>",
+    hintPrefix: "Digite assim:",
+    lblSni: "Atiradores (Daly)",
+    lblInf: "Lutadores (Daly)",
+    lblCav: "Cavalaria (Daly)",
+    phSni: "ex: 360k",
+    phInf: "ex: 360k",
+    phCav: "ex: 1.1m",
+    btn: "⚔️ Obter 2 melhores + proporção",
+    copy: "📋 Copiar resultado",
+    copied: "✅ Copiado!",
+    outIdle: "Insira os números e pressione o botão.",
+    err: "Insira primeiro as tropas do acampamento Daly.",
+    headerEnemy: "📌 Acampamento Daly:",
+    sni: "Atiradores",
+    inf: "Lutadores",
+    cav: "Cavalaria",
+    bestLine: "✅ Melhor ataque:",
+    best: "✅ Melhores 2 tipos para atacar:",
+    reason1: "Motivo rápido:",
+    reason2: "O maior tipo inimigo é",
+    reason3: "→ o melhor contra é",
+    reason4: "Adicionamos",
+    reason5: "porque ele countera o tipo que vence",
+    sig: "Este assistente foi criado por",
+    dark: "🌙 Escuro",
+    light: "☀️ Claro",
+    share: '🔗 Compartilhar',
+    shared: '✅ Link pronto!',
+    reset: '♻️ Redefinir',
+    ratioHint: 'Proporção ideal',
+    legendTitle: 'Recomendação',
+    toastReset: 'Redefinição concluída',
+    toastNeed: 'Insira as tropas Daly primeiro.',
+    toastError: 'Falha ao ler a imagem',
+    enterHint: "Insira as tropas Daly primeiro.",
+    smartTitle: "Análise Inteligente",
+    smartSub: "Visão aprofundada da formação para melhores resultados",
+    smartEnemy: "Tropas Inimigas",
+    smartRec: "Recomendação",
+    smartWhy: "Por que essa escolha?",
+    smartWhy1: "é o melhor contra-ataque para",
+    smartWhy2: "O inimigo possui uma boa parte de",
+    smartWhy3: "então adicionamos",
+    smartWhy4: "Não há grandes ameaças secundárias.",
+    smartWhy5: "A proporção ideal calculada é",
+    smartNote: "Nota: Estas proporções são baseadas em cálculos para minimizar suas perdas.",
+    uploadText: "📷 Enviar Relatório de Exploração",
+    uploadLblGallery: "Galeria",       uploadSubGallery: "Do seu álbum",
+    uploadLblCamera: "Câmera",         uploadSubCamera: "Tirar foto",
+    uploadLblFile: "Arquivo",          uploadSubFile: "Do dispositivo",
+    loadingText: "🤖 Analisando imagem...",
+    ocrFail: "Certifique-se de que a imagem é um relatório de exploração claro.",
+    tickerBadge: "📢 NOVIDADE",
+    tickerMsg: "🚧 Envio de imagens com IA em desenvolvimento — IA aprimorada chegando em breve ✨",
+    vipInactive: "Acesso VIP", vipActive: "👑 VIP Ativo",
+    vipSub: "Leitura avançada de imagens com IA", vipSubActive: "✨ Gemini lê suas imagens com alta precisão",
+    vipPlaceholder: "🔑 Insira a Chave VIP...", vipHint: "🌟 Visão com IA Avançada — VIP",
+    vipSave: "Ativar", vipSaved: "👑 VIP Ativado!", vipBadKey: "❌ Chave VIP inválida",
+    vipCleared: "🗑️ VIP Removido", vipLoading: "✨ Gemini AI está lendo a imagem...",
+    campsSectionTitle: "Acampamentos Salvos", campsSectionSub: "Salve e carregue números com um clique",
+    campNamePh: "Nome do acampamento...", campSave: "Salvar", campLoad: "Carregar",
+    campNoName: "⚠️ Insira um nome", campNoTroops: "⚠️ Insira as tropas primeiro",
+    campSaved: "💾 Salvo!", campUpdated: "✅ Acampamento atualizado",
+    campsEmpty: "📭 Nenhum acampamento salvo", campDelTitle: "Excluir",
+    clearBtn: "✕ Limpar"
+  }
+};
+
+let LANG = "ar";
+let LAST_COPY_TEXT = "";
+
+function setActiveBtn(lang) {["ar","en","pt"].forEach(l => { 
+    const el = document.getElementById("btn-" + l); 
+    if(el) el.classList.toggle("active", l === lang); 
+  }); 
+}
+
+function setLang(lang) {
+  if (!T[lang]) lang = "ar"; 
+  LANG = lang; 
+  safeSetStorage("F11_LANG", lang); 
+  
+  const t = T[lang];
+  document.getElementById("title").innerHTML = t.title;
+  document.getElementById("hint").innerHTML = `${t.hintPrefix} <span class="pill">360.0k</span> <span class="pill">1.1m</span>`;
+  document.querySelector("#lblSni span").innerText = t.lblSni;
+  document.querySelector("#lblInf span").innerText = t.lblInf;
+  document.querySelector("#lblCav span").innerText = t.lblCav;
+  document.getElementById("enSni").placeholder = t.phSni;
+  document.getElementById("enInf").placeholder = t.phInf;
+  document.getElementById("enCav").placeholder = t.phCav;
+  document.getElementById("calcBtn").innerHTML = t.btn;
+  document.getElementById("smartBtn").innerHTML = "🧠 " + (t.smartTitle || "Smart Analysis");
+  document.getElementById("copyBtn").innerHTML = t.copy;
+  document.getElementById("shareBtn").innerHTML = t.share;
+  document.getElementById("resetBtn").innerHTML = t.reset;
+  document.getElementById("uploadText").innerText = t.uploadText || "📷 رفع تقرير الاستطلاع";
+  // أزرار الرفع الجديدة
+  if(t.uploadLblGallery) { 
+    const el = document.getElementById("uploadLblGallery"); if(el) el.innerText = t.uploadLblGallery;
+    const el2 = document.getElementById("uploadSubGallery"); if(el2) el2.innerText = t.uploadSubGallery||"";
+    const el3 = document.getElementById("uploadLblCamera");  if(el3) el3.innerText = t.uploadLblCamera||"";
+    const el4 = document.getElementById("uploadSubCamera");  if(el4) el4.innerText = t.uploadSubCamera||"";
+    const el5 = document.getElementById("uploadLblFile");    if(el5) el5.innerText = t.uploadLblFile||"";
+    const el6 = document.getElementById("uploadSubFile");    if(el6) el6.innerText = t.uploadSubFile||"";
+  }
+  document.getElementById("loadingText").innerText = t.loadingText;
+  document.getElementById("ratioHint").innerText = t.ratioHint;
+  document.getElementById("legendTitle").innerText = t.legendTitle;
+  document.getElementById("sig").innerHTML = `${t.sig} <span>F11</span>`;
+  // تحديث نص الشريط المتحرك
+  const badge = document.getElementById("tickerBadge");
+  if(badge) badge.innerText = t.tickerBadge || "📢";
+  const msg = t.tickerMsg || "";
+  ["tickerText1","tickerText2","tickerText3"].forEach(id => {
+    const el = document.getElementById(id); if(el) el.innerText = msg;
+  });
+  
+  const outEl = document.getElementById("out");
+  const outTxt = outEl.innerText.trim();
+  if(!outEl.classList.contains("error") && (outTxt === T.ar.outIdle || outTxt === T.en.outIdle || outTxt === T.pt.outIdle)) { 
+    outEl.innerText = t.outIdle; 
+  }
+  
+  document.documentElement.dir = (lang === "ar") ? "rtl" : "ltr";
+  document.documentElement.lang = lang;
+  
+  if(LAST_REC) showChart(LAST_REC.A, LAST_REC.B, LAST_REC.aShare, LAST_REC.bShare);
+  
+  // تحديث أزرار مسح الحقول
+  ['clearBtnSni','clearBtnInf','clearBtnCav'].forEach(id => {
+    const el = document.getElementById(id); if(el) el.innerText = t.clearBtn || '✕ مسح';
+  });
+
+  refreshDarkButtonText();
+  setActiveBtn(lang);
+  updateAiStatus();
+  renderCamps();
+}
+
+function refreshDarkButtonText() {
+  const t = T[LANG] || T.ar; 
+  const isDark = document.body.classList.contains("dark");
+  document.getElementById("darkBtn").innerText = isDark ? t.light : t.dark;
+}
+
+function toggleDark() {
+  try {
+    document.body.classList.toggle("dark"); 
+    safeSetStorage("F11_DARK", document.body.classList.contains("dark") ? "1" : "0");
+    refreshDarkButtonText(); 
+    if (LAST_REC) showChart(LAST_REC.A, LAST_REC.B, LAST_REC.aShare, LAST_REC.bShare);
+  } catch(e) { }
+}
+
+function parseNum(v) {
+  v = (v||"").toString().toLowerCase().trim().replace(/,/g,"");
+  if(v.endsWith("k")) return (parseFloat(v)||0) * 1000;
+  if(v.endsWith("m")) return (parseFloat(v)||0) * 1000000;
+  return parseFloat(v)||0;
+}
+
+const counterOf = { sni:"cav", inf:"sni", cav:"inf" };
+const beatenBy  = { cav:"inf", sni:"cav", inf:"sni" };
+function pct(x) { return Math.round(x*100); }
+function typeText(type) { const t = T[LANG]; if(type==="sni") return t.sni; if(type==="inf") return t.inf; return t.cav; }
+
+function calc() {
+  const en = { 
+    sni: parseNum(document.getElementById("enSni").value), 
+    inf: parseNum(document.getElementById("enInf").value), 
+    cav: parseNum(document.getElementById("enCav").value) 
+  };
+  const total = en.sni + en.inf + en.cav;
+  const t = T[LANG] || T.ar;
+  
+  document.getElementById("smartBox").style.display = "none";
+  if(total <= 0) { showOut(t.err, ""); toast(t.toastNeed || t.err); hideChart(); return; }
+
+  let major = "sni"; 
+  if(en.inf > en[major]) major = "inf"; 
+  if(en.cav > en[major]) major = "cav";
+  
+  const A = counterOf[major]; 
+  const danger = beatenBy[A]; 
+  const B = counterOf[danger];
+  const dangerRatio = en[danger] / total;
+  
+  let aShare;
+  if(dangerRatio < 0.18) aShare = 0.80; 
+  else if(dangerRatio < 0.30) aShare = 0.70; 
+  else if(dangerRatio < 0.45) aShare = 0.65; 
+  else aShare = 0.60;
+  
+  if(B === A) aShare = 1.0;
+  const bShare = Math.max(0, 1 - aShare);
+
+  LAST_COPY_TEXT = `${typeText(A)} ${pct(aShare)}% + ${typeText(B)} ${pct(bShare)}%`;
+  const out = `${t.headerEnemy}\n${t.sni}: ${en.sni.toLocaleString()}\n${t.inf}: ${en.inf.toLocaleString()}\n${t.cav}: ${en.cav.toLocaleString()}\n\n${t.bestLine} ${LAST_COPY_TEXT}\n\n${t.best}\n1) ${typeText(A)} = ${pct(aShare)}%\n2) ${typeText(B)} = ${pct(bShare)}%\n\n${t.reason1}\n${t.reason2} ${typeText(major)} ${t.reason3} ${typeText(A)}.\n${t.reason4} ${typeText(B)} ${t.reason5} ${typeText(A)}.`;
+  
+  showOut(out, LAST_COPY_TEXT); 
+  showChart(A, B, aShare, bShare);
+}
+
+function smartAnalyze() {
+  const sni = parseNum(document.getElementById("enSni").value);
+  const inf = parseNum(document.getElementById("enInf").value);
+  const cav = parseNum(document.getElementById("enCav").value);
+  const box = document.getElementById("smartBox"); 
+  if(!box) return;
+  
+  const t = T[LANG] || T.ar; 
+  const total = sni + inf + cav;
+  if(!total) { box.style.display="none"; showOut(t.enterHint, ""); toast(t.enterHint); hideChart(); return; }
+
+  const e =[sni/total, inf/total, cav/total];
+  const counter =[2,0,1]; const losesTo =[2,0,1];      
+  const typeLabel = (i) => { if(i===0) return t.sni; if(i===1) return t.inf; return t.cav; };
+  const typeKey = (i) => { if(i===0) return "sni"; if(i===1) return "inf"; return "cav"; };
+
+  let E1 = 0; 
+  for(let i=1; i<3; i++) if(e[i] > e[E1]) E1 = i;
+  
+  const P = counter[E1]; 
+  const V = losesTo[P]; 
+  const S = counter[V];             
+  const dominance = e[E1]; 
+  const vShare = e[V];
+
+  let primaryPct = 70 + (dominance - 0.50)*30 - vShare*40;
+  primaryPct = Math.max(55, Math.min(85, primaryPct)); 
+  primaryPct = Math.round(primaryPct/5)*5; 
+  primaryPct = Math.max(55, Math.min(85, primaryPct));
+  const secondaryPct = 100 - primaryPct;
+
+  const eSni = Math.round(e[0]*100); 
+  const eInf = Math.round(e[1]*100); 
+  const eCav = Math.round(e[2]*100);
+  
+  const whyLines =[];
+  whyLines.push(`<li>${typeLabel(P)} ${t.smartWhy1} ${typeLabel(E1)}.</li>`);
+  if(vShare > 0.18) { 
+    whyLines.push(`<li>${t.smartWhy2} ${typeLabel(V)} (${Math.round(vShare*100)}%). ${t.smartWhy3} ${typeLabel(S)}.</li>`); 
+  } else { 
+    whyLines.push(`<li>${t.smartWhy4}</li>`); 
+  }
+  whyLines.push(`<li>${t.smartWhy5} <b style="color:var(--btn)">${primaryPct}/${secondaryPct}</b>.</li>`);
+
+  box.innerHTML = `<h3>🧠 ${t.smartTitle}</h3><div class="muted">${t.smartSub}</div><div class="smartGrid"><div class="pill">📊 ${t.smartEnemy}: ${t.sni} ${eSni}% &nbsp;·&nbsp; ${t.inf} ${eInf}% &nbsp;·&nbsp; ${t.cav} ${eCav}%</div><div class="pill">✅ ${t.smartRec}: <b style="margin: 0 5px;">${typeLabel(P)} ${primaryPct}%</b> + <b style="margin: 0 5px;">${typeLabel(S)} ${secondaryPct}%</b></div></div><div class="smartWhyText"><div style="font-weight:800; color:var(--text);">${t.smartWhy}</div><ul>${whyLines.join("")}</ul><div style="margin-top:14px;opacity:.8;font-size:12px;">${t.smartNote}</div></div>`;
+  box.style.display = "block";
+  
+  LAST_COPY_TEXT = `${typeLabel(P)} ${primaryPct}% + ${typeLabel(S)} ${secondaryPct}%`;
+  showOut(`✅ ${t.smartRec}: ${LAST_COPY_TEXT}`, LAST_COPY_TEXT);
+  showChart(typeKey(P), typeKey(S), primaryPct/100, secondaryPct/100);
+}
+
+function showOut(text, copyLine) { 
+  const outEl = document.getElementById("out"); 
+  outEl.classList.remove("error");
+  outEl.classList.remove("flash"); 
+  outEl.innerText = text; 
+  requestAnimationFrame(()=> outEl.classList.add("flash")); 
+  if(!copyLine) LAST_COPY_TEXT = ""; 
+}
+
+async function copyResult() {
+  const t = T[LANG] || T.ar; 
+  const text = LAST_COPY_TEXT || document.getElementById("out").innerText.trim();
+  if(!text || text === t.outIdle || document.getElementById("out").classList.contains("error")) { 
+    toast(t.toastNeed || t.err); return; 
+  }
+  
+  try { 
+    await navigator.clipboard.writeText(text); 
+    const btn = document.getElementById("copyBtn"); 
+    btn.innerHTML = `✅ ${t.copied.replace('✅ ', '')}`; 
+    setTimeout(()=> btn.innerHTML = t.copy, 1500); 
+    toast(t.copied); 
+  } catch(e) { 
+    const ta = document.createElement("textarea"); 
+    ta.value = text; 
+    document.body.appendChild(ta); 
+    ta.select(); 
+    document.execCommand("copy"); 
+    document.body.removeChild(ta); 
+    const btn = document.getElementById("copyBtn"); 
+    btn.innerHTML = `✅ ${t.copied.replace('✅ ', '')}`; 
+    setTimeout(()=> btn.innerHTML = t.copy, 1500); 
+    toast(t.copied); 
+  }
+}
+
+const TYPE_ICON = { sni:"sniper.png", inf:"fighter.png", cav:"cavalry.png" };
+const TYPE_COLOR = { sni:"#1a73e8", inf:"#d97706", cav:"#6d28d9" }; 
+let LAST_REC = null; 
+let donutAnimFrame = null;
+
+function hideChart() { 
+  document.getElementById("chartWrap").style.display = "none"; 
+  LAST_REC = null; 
+}
+
+function showChart(A, B, aShare, bShare) {
+  LAST_REC = {A,B,aShare,bShare}; 
+  const t = T[LANG] || T.ar;
+  document.getElementById("ratioText").innerText = `${pct(aShare)} / ${pct(bShare)}`; 
+  document.getElementById("ratioHint").innerText = t.ratioHint; 
+  document.getElementById("nameA").innerText = typeText(A); 
+  document.getElementById("nameB").innerText = typeText(B); 
+  document.getElementById("iconA").src = TYPE_ICON[A]; 
+  document.getElementById("iconB").src = TYPE_ICON[B]; 
+  document.getElementById("pctA").innerText = `${pct(aShare)}%`; 
+  document.getElementById("pctB").innerText = `${pct(bShare)}%`; 
+  document.getElementById("dotA").style.background = TYPE_COLOR[A] || "#4aa3ff"; 
+  document.getElementById("dotB").style.background = TYPE_COLOR[B] || "#d97706"; 
+  document.getElementById("legendTitle").innerText = t.legendTitle;
+  
+  drawRealisticDonut(A, B, aShare); 
+  document.getElementById("chartWrap").style.display = "flex";
+}
+
+function drawRealisticDonut(typeA, typeB, aShare) {
+  const canvas = document.getElementById("chart"); 
+  const ctx = canvas.getContext("2d"); 
+  const W = canvas.width, H = canvas.height; 
+  const cx = W / 2, cy = H / 2; 
+  const r = Math.min(W, H) / 2 - 20; 
+  const thickness = 22;
+  
+  const getGradient = (type) => { 
+    const grad = ctx.createLinearGradient(0, 0, W, H); 
+    if (type === "sni") { grad.addColorStop(0, "#80c6ff"); grad.addColorStop(1, "#1a73e8"); } 
+    else if (type === "inf") { grad.addColorStop(0, "#fbbf24"); grad.addColorStop(1, "#b45309"); } 
+    else if (type === "cav") { grad.addColorStop(0, "#b49afe"); grad.addColorStop(1, "#5b21b6"); } 
+    return grad; 
+  };
+  
+  const gradA = getGradient(typeA); 
+  const gradB = getGradient(typeB);
+  
+  if (donutAnimFrame) cancelAnimationFrame(donutAnimFrame); 
+  let startTime = null; 
+  const duration = 1200; 
+  
+  function animate(timestamp) {
+    if (!startTime) startTime = timestamp; 
+    let progress = (timestamp - startTime) / duration; 
+    if (progress > 1) progress = 1;
+    
+    const ease = progress === 1 ? 1 : 1 - Math.pow(2, -10 * progress); 
+    ctx.clearRect(0, 0, W, H); 
+    const isDark = document.body.classList.contains("dark");
+    
+    ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.strokeStyle = isDark ? "#171a21" : "#e2e8f0"; ctx.lineWidth = thickness; ctx.shadowColor = "transparent"; ctx.stroke();
+    ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.strokeStyle = isDark ? "rgba(0,0,0,0.5)" : "rgba(0,0,0,0.05)"; ctx.lineWidth = thickness; ctx.stroke();
+    
+    const startAngle = -Math.PI / 2; 
+    const currentAShare = aShare * ease; 
+    const aEnd = startAngle + (Math.PI * 2 * currentAShare); 
+    ctx.lineCap = "round";
+    
+    if (aShare < 1) { 
+      const currentBShare = (1 - aShare) * ease; 
+      const bEnd = aEnd + (Math.PI * 2 * currentBShare); 
+      ctx.beginPath(); ctx.arc(cx, cy, r, aEnd, bEnd); ctx.strokeStyle = gradB; ctx.lineWidth = thickness; ctx.shadowColor = isDark ? "rgba(0,0,0,0.6)" : "rgba(0,0,0,0.25)"; ctx.shadowBlur = 10; ctx.shadowOffsetX = 2; ctx.shadowOffsetY = 6; ctx.stroke(); 
+    }
+    
+    ctx.beginPath(); ctx.arc(cx, cy, r, startAngle, aEnd); ctx.strokeStyle = gradA; ctx.lineWidth = thickness; ctx.shadowColor = isDark ? "rgba(0,0,0,0.8)" : "rgba(0,0,0,0.35)"; ctx.shadowBlur = 15; ctx.shadowOffsetX = 4; ctx.shadowOffsetY = 8; ctx.stroke();
+    
+    if (progress < 1) donutAnimFrame = requestAnimationFrame(animate);
+  }
+  donutAnimFrame = requestAnimationFrame(animate);
+}
+
+function toast(msg) { 
+  const el = document.getElementById("toast"); 
+  el.innerText = msg; 
+  el.classList.add("show"); 
+  clearTimeout(toast._t); 
+  toast._t = setTimeout(()=> el.classList.remove("show"), 2000); 
+}
+
+async function shareResult() { 
+  const t = T[LANG] || T.ar; 
+  if(!LAST_COPY_TEXT) { toast(t.toastNeed || t.err); return; } 
+  const url = location.href; 
+  const text = `${t.bestLine} ${LAST_COPY_TEXT}\n${url}`; 
+  if(navigator.share) { 
+    try{ await navigator.share({ title: document.title, text, url }); toast(t.shared); return; } catch(e){} 
+  } 
+  try{ await navigator.clipboard.writeText(text); toast(t.shared); } catch(e){ toast(t.copied); } 
+}
+
+function clearField(inputId) {
+  const inp = document.getElementById(inputId);
+  if (inp) { inp.value = ''; inp.focus(); }
+}
+
+function resetAll() {
+  document.getElementById("enSni").value = "";
+  document.getElementById("enInf").value = "";
+  document.getElementById("enCav").value = ""; 
+  LAST_COPY_TEXT = ""; 
+  hideChart(); 
+  document.getElementById("smartBox").style.display = "none"; 
+  const outEl = document.getElementById("out");
+  outEl.classList.remove("error");
+  outEl.innerText = (T[LANG] || T.ar).outIdle; 
+  toast((T[LANG] || T.ar).toastReset || "Reset"); 
+}
+
+/* ================== تشغيل الموقع ================== */
+document.addEventListener("DOMContentLoaded", function() {
+  try {
+    const savedLang = safeGetStorage("F11_LANG"); 
+    let autoLang = "ar"; 
+    try { 
+      const nl = (navigator.language||"").toLowerCase(); 
+      if(nl.startsWith("pt")) autoLang = "pt"; 
+      else if(nl.startsWith("en")) autoLang = "en"; 
+      else if(nl.startsWith("ar")) autoLang = "ar"; 
+    } catch(e) {} 
+    
+    setLang(savedLang || autoLang);
+
+    const savedDark = safeGetStorage("F11_DARK");
+    if(savedDark === "1") document.body.classList.add("dark");
+    refreshDarkButtonText();
+    hideChart();
+    updateAiStatus();
+    renderCamps();
+  } catch(error) {}
+});
+</script>
+
+<div class="toast" id="toast">✅</div>
+
+<script>
+  // تسجيل Service Worker لتحويل الموقع لتطبيق
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('sw.js')
+        .then(reg => console.log('تم تفعيل التطبيق بنجاح!', reg))
+        .catch(err => console.log('فشل تفعيل التطبيق', err));
+    });
+  }
+</script>
+
+<script>
+/* ===== مراقب الشريط المتحرك — يمنع التوقف على الهاتف ===== */
+(function() {
+  function forceTickerRun() {
+    var el = document.querySelector('.news-ticker-inner');
+    if (!el) return;
+    // إعادة تشغيل الأنيميشن بإزالته وإضافته من جديد
+    el.style.animation = 'none';
+    el.style.webkitAnimation = 'none';
+    void el.offsetWidth; // إجبار المتصفح على إعادة الرسم
+    el.style.animation = 'tickerScroll 32s linear infinite';
+    el.style.webkitAnimation = 'tickerScroll 32s linear infinite';
+  }
+
+  // عند رجوع الشاشة للنشاط (من الخلفية أو قفل الشاشة)
+  document.addEventListener('visibilitychange', function() {
+    if (document.visibilityState === 'visible') forceTickerRun();
+  });
+
+  // عند رفع الإصبع عن الشاشة في الهاتف
+  document.addEventListener('touchend', function() {
+    setTimeout(forceTickerRun, 100);
+  }, { passive: true });
+
+  // عند الضغط على الشاشة
+  document.addEventListener('touchstart', function() {
+    setTimeout(forceTickerRun, 100);
+  }, { passive: true });
+
+  // فحص دوري كل 3 ثوان — ضمان إضافي
+  setInterval(function() {
+    var el = document.querySelector('.news-ticker-inner');
+    if (!el) return;
+    var anim = window.getComputedStyle(el).animationPlayState
+            || window.getComputedStyle(el).webkitAnimationPlayState;
+    if (anim === 'paused') forceTickerRun();
+  }, 3000);
+})();
+</script>
+
+</body>
+</html>
