@@ -672,6 +672,45 @@ function otsuThreshold(gray) {
     return bestT;
 }
 
+/* ─── Auto-detect the vertical center of the troop summary row ─── */
+function findTroopRowY(imgEl) {
+    const sw = Math.min(imgEl.width, 400);
+    const sh = imgEl.height;
+    const c = document.createElement('canvas');
+    c.width = sw; c.height = sh;
+    const ctx = c.getContext('2d');
+    ctx.filter = 'grayscale(1) contrast(2)';
+    ctx.drawImage(imgEl, 0, 0, sw, sh);
+    ctx.filter = 'none';
+    const data = ctx.getImageData(0, 0, sw, sh).data;
+    // Scan 22%–72% of image height (skip header/footer)
+    const startY = Math.floor(sh * 0.22);
+    const endY   = Math.floor(sh * 0.72);
+    const bH     = Math.max(4, Math.floor(sh * 0.035));
+    const xL     = Math.floor(sw * 0.05);
+    const xR     = Math.floor(sw * 0.95);
+    let bestY = (startY + endY) / 2, bestScore = -1;
+    for (let y = startY; y < endY - bH; y += 3) {
+        // Divide row into 6 horizontal buckets, count dark pixels per bucket
+        const buckets = new Array(6).fill(0);
+        for (let dy = 0; dy < bH; dy++) {
+            for (let x = xL; x < xR; x++) {
+                const idx = ((y + dy) * sw + x) * 4;
+                const lum = 0.299*data[idx] + 0.587*data[idx+1] + 0.114*data[idx+2];
+                if (lum < 100) buckets[Math.floor((x - xL) / (xR - xL) * 6)]++;
+            }
+        }
+        const minThresh    = bH * 3;
+        const activeBuckets = buckets.filter(b => b > minThresh).length;
+        const totalDark    = buckets.reduce((a, b) => a + b, 0);
+        // Prefer rows with 2–4 spread clusters (= 3 numbers) and high dark count
+        const score = totalDark * (activeBuckets >= 2 ? 1 + activeBuckets * 0.3 : 0.4);
+        if (score > bestScore) { bestScore = score; bestY = y + bH / 2; }
+    }
+    console.log(`🎯 findTroopRowY: ${(bestY/sh*100).toFixed(1)}%`);
+    return bestY / sh;
+}
+
 /* ─── صورة بـ Otsu binarization (أنظف بكثير من CSS contrast) ─── */
 function makeOtsuImage(file, scale, cropTop, cropBottom) {
     return new Promise((resolve, reject) => {
@@ -820,6 +859,10 @@ function cleanTroopWord(raw) {
     t = t.replace(/[bB](?=\d)/g, '8');
     // إصلاح: 360.Ok → 360.0k (O بعد نقطة)
     t = t.replace(/\.([oO])/g, '.0');
+    // إصلاح: rn/m confusion → m (e.g. "1.1rn" → "1.1m")
+    t = t.replace(/rn/g, 'm');
+    // إصلاح: الفراغ بين رقم وحرف k/m (e.g. "360 k" → "360k")
+    t = t.replace(/(\d)\s+([km])/gi, '$1$2');
     t = t.toLowerCase();
     // إزالة أحرف غير مطلوبة من البداية والنهاية
     t = t.replace(/^[^0-9]+/, '');
@@ -828,7 +871,18 @@ function cleanTroopWord(raw) {
     t = t.replace(/\.{2,}/g, '.');
     // مطابقة نمط القوات: رقم + k أو m (مع أو بدون عشرية)
     const m = t.match(/(\d+\.?\d*[km])/i);
-    if (m) return m[1];
+    if (m) {
+        let val = m[1];
+        // إصلاح: "11m" أو "12m" ... "19m" → likely "1.Xm" (decimal misread as digit)
+        // OCR often reads "1.1m" as "11m" when the dot gets enlarged by binarization
+        const missingDot = val.match(/^(\d{2})(m)$/i);
+        if (missingDot) {
+            const digits = missingDot[1];
+            val = digits[0] + '.' + digits[1] + missingDot[2].toLowerCase();
+        }
+        // إصلاح: "1m" → might be "1.Xm" but we can't know X — keep as is
+        return val;
+    }
     // فقط أصفار
     if (/^0+$/.test(t)) return '0';
     // رقم بدون لاحقة (من OCR فردي) → إرجاعه إذا كان رقم صالح
@@ -1263,20 +1317,36 @@ async function handleImageUpload(event) {
 
         // ① تجهيز الصور: صورة كاملة + 3 صور لكل رقم على حدة
         if (loadText) loadText.innerText = "🖼️ تحسين الصورة...";
-        // القص المُحسّن لتقارير الاستطلاع: الأرقام الرئيسية في المنتصف أعلى
-        // بناءً على تحليل الصور: الصف الأول من القوات يقع بين 25%-60% من الصورة
+
+        // Pre-load image once to detect the troop row position automatically
+        const _imgEl = await new Promise((res, rej) => {
+            const _i = new Image();
+            _i.onload = () => res(_i);
+            _i.onerror = () => rej(new Error("فشل تحميل الصورة للمعالجة"));
+            _i.src = URL.createObjectURL(file);
+        });
+
+        // Auto-detect where the troop summary row is (replaces hardcoded 0.25–0.65)
+        const _rowY  = findTroopRowY(_imgEl);
+        const _halfH = 0.13;  // ±13% gives a taller band to catch numbers reliably
+        const _top   = Math.max(0.05, _rowY - _halfH);
+        const _bot   = Math.min(0.95, _rowY + _halfH);
+        console.log(`📐 Crop zone: top=${(_top*100).toFixed(0)}% bot=${(_bot*100).toFixed(0)}%`);
+
+        // Tight non-overlapping columns — no bleed between numbers
         const [imgFull, imgL, imgM, imgR] = await Promise.all([
-            makeOtsuImage(file, 3),
-            makeNumberImage(file, 4, 0.25, 0.65, 0.00, 0.37),
-            makeNumberImage(file, 4, 0.25, 0.65, 0.30, 0.70),
-            makeNumberImage(file, 4, 0.25, 0.65, 0.63, 1.00)
+            makeOtsuImage(file, 4),
+            makeNumberImage(file, 4, _top, _bot, 0.02, 0.36),
+            makeNumberImage(file, 4, _top, _bot, 0.36, 0.67),
+            makeNumberImage(file, 4, _top, _bot, 0.67, 0.98)
         ]);
 
         // ② قراءة OCR: صورة كاملة + 3 أرقام بالتوازي
         if (loadText) loadText.innerText = "🔍 قراءة القوات...";
+        // pageseg_mode 8 = single word — better for isolated number crops than mode 7
         const numParams = {
-            tessedit_char_whitelist: '0123456789.kKmM ',
-            tessedit_pageseg_mode: '7'
+            tessedit_char_whitelist: '0123456789.kKmM',
+            tessedit_pageseg_mode: '8'
         };
         const [dataFull, dL, dM, dR] = await Promise.all([
             runOCRPass(imgFull, { tessedit_pageseg_mode: '11' }, m => {
@@ -1289,7 +1359,6 @@ async function handleImageUpload(event) {
         ]);
 
         console.log("═══════════════════════════════════════");
-        console.log("🔍 Full OCR:", dataFull.text.substring(0, 300));
         console.log("🔍 Left:", dL.text.trim(), "| Center:", dM.text.trim(), "| Right:", dR.text.trim());
         console.log("═══════════════════════════════════════");
 
@@ -1353,10 +1422,15 @@ async function handleImageUpload(event) {
         if (validNow < 1) {
             console.log("⚠️ محاولة طوارئ بقص مختلف...");
             if (loadText) loadText.innerText = "🔄 محاولة إضافية...";
+            // Try an alternative row position (shift ±15% from auto-detected)
+            const _altY   = (_rowY > 0.5) ? Math.max(0.20, _rowY - 0.15) : Math.min(0.70, _rowY + 0.15);
+            const _altTop = Math.max(0.05, _altY - 0.12);
+            const _altBot = Math.min(0.95, _altY + 0.12);
+            console.log(`🔄 Emergency crop: top=${(_altTop*100).toFixed(0)}% bot=${(_altBot*100).toFixed(0)}%`);
             const [eL, eM, eR] = await Promise.all([
-                makeNumberImage(file, 5, 0.32, 0.68, 0.00, 0.35),
-                makeNumberImage(file, 5, 0.32, 0.68, 0.33, 0.68),
-                makeNumberImage(file, 5, 0.32, 0.68, 0.65, 1.00)
+                makeNumberImage(file, 5, _altTop, _altBot, 0.02, 0.36),
+                makeNumberImage(file, 5, _altTop, _altBot, 0.36, 0.67),
+                makeNumberImage(file, 5, _altTop, _altBot, 0.67, 0.98)
             ]);
             const eP = { tessedit_char_whitelist: '0123456789.kKmM', tessedit_pageseg_mode: '8' };
             const [edL, edM, edR] = await Promise.all([
@@ -1380,16 +1454,32 @@ async function handleImageUpload(event) {
         const sni = (final.sniper  || "0").toLowerCase();
         const cav = (final.cavalry || "0").toLowerCase();
 
-        const isOK = v => /^\d+\.?\d*[km]$|^0$/.test(v);
+        const isOK      = v => /^\d+\.?\d*[km]$|^0$/.test(v);
+        const isRealNum = v => /^\d+\.?\d*[km]$/i.test(v);
+
+        // Detect all-zeros: OCR ran but found nothing — show clear error instead of silent 0 0 0
+        const realCount = [inf, sni, cav].filter(isRealNum).length;
+        if (realCount === 0) {
+            throw new Error(
+                (T[LANG]||T.ar).ocrFail ||
+                "⚠️ لم يتمكن OCR من قراءة الأرقام. تأكد أن الصورة تقرير استطلاع واضح وأعد المحاولة."
+            );
+        }
+
         if (![inf, sni, cav].some(isOK)) {
             throw new Error("لم يتمكن OCR من قراءة أرقام القوات. جرب صورة أوضح أو أدخل يدوياً.");
         }
 
-        document.getElementById("enInf").value = isOK(inf) ? inf : "0";
-        document.getElementById("enSni").value = isOK(sni) ? sni : "0";
-        document.getElementById("enCav").value = isOK(cav) ? cav : "0";
+        document.getElementById("enInf").value = isRealNum(inf) ? inf : "0";
+        document.getElementById("enSni").value = isRealNum(sni) ? sni : "0";
+        document.getElementById("enCav").value = isRealNum(cav) ? cav : "0";
 
-        toast(`✅ ${inf} · ${sni} · ${cav}`);
+        // Warn if partial read (some values still 0)
+        if (realCount < 3) {
+            toast(`⚠️ قراءة جزئية (${realCount}/3) — تحقق من الأرقام`);
+        } else {
+            toast(`✅ ${inf} · ${sni} · ${cav}`);
+        }
         setTimeout(() => smartAnalyze(), 400);
 
     } catch(err) {
