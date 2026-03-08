@@ -818,13 +818,15 @@ function cleanTroopWord(raw) {
     t = t.replace(/[,;:]/g, '.');
     t = t.replace(/[sS](?=[0-9])/g, '5');
     t = t.replace(/[bB](?=\d)/g, '8');
+    // إصلاح: 360.Ok → 360.0k (O بعد نقطة)
+    t = t.replace(/\.([oO])/g, '.0');
     t = t.toLowerCase();
     // إزالة أحرف غير مطلوبة من البداية والنهاية
     t = t.replace(/^[^0-9]+/, '');
     t = t.replace(/[^0-9km.]+$/, '');
     // إصلاح: نقاط متعددة → نقطة واحدة
     t = t.replace(/\.{2,}/g, '.');
-    // مطابقة نمط القوات: رقم + k أو m
+    // مطابقة نمط القوات: رقم + k أو m (مع أو بدون عشرية)
     const m = t.match(/(\d+\.?\d*[km])/i);
     if (m) return m[1];
     // فقط أصفار
@@ -875,13 +877,13 @@ function extractTroopsFromWords(words, imgHeight) {
     if (!best) best = rows.find(r => r.length === 2);
     if (!best) return null;
 
-    // ترتيب من يسار لليمين = مقاتل ← قناص ← جوال
+    // ترتيب من يسار لليمين = قناص ← مقاتل ← جوال
     best.sort((a, b) => a.bbox.x0 - b.bbox.x0);
     const vals = best.map(w => w.cleanVal);
     while (vals.length < 3) vals.push('0');
 
     return {
-        fighter: vals[0], sniper: vals[1], cavalry: vals[2],
+        sniper:  vals[0], fighter: vals[1], cavalry: vals[2],
         words: best // نحفظ الكلمات الأصلية للثقة
     };
 }
@@ -1261,11 +1263,13 @@ async function handleImageUpload(event) {
 
         // ① تجهيز الصور: صورة كاملة + 3 صور لكل رقم على حدة
         if (loadText) loadText.innerText = "🖼️ تحسين الصورة...";
+        // القص المُحسّن لتقارير الاستطلاع: الأرقام الرئيسية في المنتصف أعلى
+        // بناءً على تحليل الصور: الصف الأول من القوات يقع بين 25%-60% من الصورة
         const [imgFull, imgL, imgM, imgR] = await Promise.all([
             makeOtsuImage(file, 3),
-            makeNumberImage(file, 4, 0.30, 0.80, 0.00, 0.37),
-            makeNumberImage(file, 4, 0.30, 0.80, 0.30, 0.70),
-            makeNumberImage(file, 4, 0.30, 0.80, 0.63, 1.00)
+            makeNumberImage(file, 4, 0.25, 0.65, 0.00, 0.37),
+            makeNumberImage(file, 4, 0.25, 0.65, 0.30, 0.70),
+            makeNumberImage(file, 4, 0.25, 0.65, 0.63, 1.00)
         ]);
 
         // ② قراءة OCR: صورة كاملة + 3 أرقام بالتوازي
@@ -1291,9 +1295,11 @@ async function handleImageUpload(event) {
 
         // ③ استخراج القوات
         const parsedFull = extractFromData(dataFull);
+        // ترتيب الأعمدة في تقرير الاستطلاع من اليسار: قناص | مقاتل | جوال
+        // (اليسار = sniper، الوسط = fighter/inf، اليمين = cavalry)
         const perNum = {
-            fighter: cleanTroopWord(dL.text) || '0',
-            sniper:  cleanTroopWord(dM.text) || '0',
+            sniper:  cleanTroopWord(dL.text) || '0',
+            fighter: cleanTroopWord(dM.text) || '0',
             cavalry: cleanTroopWord(dR.text) || '0'
         };
         const headerTotal = extractHeaderTotal(dataFull.text);
@@ -1348,9 +1354,9 @@ async function handleImageUpload(event) {
             console.log("⚠️ محاولة طوارئ بقص مختلف...");
             if (loadText) loadText.innerText = "🔄 محاولة إضافية...";
             const [eL, eM, eR] = await Promise.all([
-                makeNumberImage(file, 5, 0.38, 0.72, 0.00, 0.35),
-                makeNumberImage(file, 5, 0.38, 0.72, 0.33, 0.68),
-                makeNumberImage(file, 5, 0.38, 0.72, 0.65, 1.00)
+                makeNumberImage(file, 5, 0.32, 0.68, 0.00, 0.35),
+                makeNumberImage(file, 5, 0.32, 0.68, 0.33, 0.68),
+                makeNumberImage(file, 5, 0.32, 0.68, 0.65, 1.00)
             ]);
             const eP = { tessedit_char_whitelist: '0123456789.kKmM', tessedit_pageseg_mode: '8' };
             const [edL, edM, edR] = await Promise.all([
@@ -1358,9 +1364,10 @@ async function handleImageUpload(event) {
                 runOCRPass(eM, eP, ()=>{}),
                 runOCRPass(eR, eP, ()=>{})
             ]);
+            // نفس الترتيب: يسار=قناص، وسط=مقاتل، يمين=جوال
             const emergency = {
-                fighter: cleanTroopWord(edL.text) || final.fighter || '0',
-                sniper:  cleanTroopWord(edM.text) || final.sniper || '0',
+                sniper:  cleanTroopWord(edL.text) || final.sniper  || '0',
+                fighter: cleanTroopWord(edM.text) || final.fighter || '0',
                 cavalry: cleanTroopWord(edR.text) || final.cavalry || '0'
             };
             console.log("📊 Emergency:", JSON.stringify(emergency));
@@ -2084,8 +2091,8 @@ document.addEventListener("DOMContentLoaded", function() {
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
       navigator.serviceWorker.register('sw.js')
-        .then(reg => console.log('تم تفعيل التطبيق بنجاح!', reg))
-        .catch(err => console.log('فشل تفعيل التطبيق', err));
+        .then(reg => console.log('✅ تم تفعيل التطبيق بنجاح!', reg))
+        .catch(err => console.warn('ℹ️ sw.js غير موجود — الموقع يعمل بدون PWA (طبيعي في بيئة التطوير)', err));
     });
   }
 </script>
