@@ -652,6 +652,29 @@ function clearUpload() {
 
 /* ================== قراءة الصورة بـ Tesseract OCR (بدون API key) ================== */
 
+/* ─── 3×3 Gaussian blur — reduces noise before Otsu thresholding ─── */
+function gaussianBlur3x3(gray, width, height) {
+    const k = [1,2,1, 2,4,2, 1,2,1]; // kernel weights, sum=16
+    const out = new Uint8Array(gray.length);
+    for (let y = 0; y < height; y++) {
+        for (let x = 0; x < width; x++) {
+            let sum = 0, wt = 0;
+            for (let dy = -1; dy <= 1; dy++) {
+                for (let dx = -1; dx <= 1; dx++) {
+                    const ny = y + dy, nx = x + dx;
+                    if (ny >= 0 && ny < height && nx >= 0 && nx < width) {
+                        const wi = (dy+1)*3 + (dx+1);
+                        sum += gray[ny*width + nx] * k[wi];
+                        wt  += k[wi];
+                    }
+                }
+            }
+            out[y*width + x] = Math.round(sum / wt);
+        }
+    }
+    return out;
+}
+
 /* ─── Otsu's Method: إيجاد أفضل عتبة ثنائية تلقائياً لكل صورة ─── */
 function otsuThreshold(gray) {
     const hist = new Array(256).fill(0);
@@ -711,6 +734,99 @@ function findTroopRowY(imgEl) {
     return bestY / sh;
 }
 
+/* ─── Auto-detect the horizontal X boundaries of the three number clusters ─── */
+function findTroopColumns(imgEl, rowY) {
+    // Use higher X resolution than findTroopRowY for accurate column splitting
+    const sw = Math.min(imgEl.width, 1200);
+    const sh = imgEl.height;
+    const c = document.createElement('canvas');
+    c.width = sw; c.height = sh;
+    const ctx = c.getContext('2d');
+    ctx.filter = 'grayscale(1) contrast(2)';
+    ctx.drawImage(imgEl, 0, 0, sw, sh);
+    ctx.filter = 'none';
+    const data = ctx.getImageData(0, 0, sw, sh).data;
+
+    // Scan the same vertical band used for cropping (±13% around rowY)
+    const y0 = Math.floor(sh * Math.max(0.05, rowY - 0.13));
+    const y1 = Math.floor(sh * Math.min(0.95, rowY + 0.13));
+    const bandH = y1 - y0;
+    if (bandH < 4) return null;
+
+    // Build per-column dark-pixel density (0..1)
+    const density = new Float32Array(sw);
+    for (let x = 0; x < sw; x++) {
+        let dark = 0;
+        for (let y = y0; y < y1; y++) {
+            const idx = (y * sw + x) * 4;
+            const lum = 0.299*data[idx] + 0.587*data[idx+1] + 0.114*data[idx+2];
+            if (lum < 128) dark++;
+        }
+        density[x] = dark / bandH;
+    }
+
+    // Smooth with moving-average (window ≈ 2% of width) to merge digit gaps within a number
+    const winR = Math.max(3, Math.floor(sw * 0.01));
+    const smoothed = new Float32Array(sw);
+    for (let x = 0; x < sw; x++) {
+        let sum = 0, cnt = 0;
+        for (let dx = -winR; dx <= winR; dx++) {
+            const nx = x + dx;
+            if (nx >= 0 && nx < sw) { sum += density[nx]; cnt++; }
+        }
+        smoothed[x] = sum / cnt;
+    }
+
+    // Threshold: 15% of peak density clearly separates text from empty gaps
+    let maxD = 0;
+    for (let x = 0; x < sw; x++) if (smoothed[x] > maxD) maxD = smoothed[x];
+    if (maxD < 0.01) return null; // image too light — can't detect anything
+    const threshold = maxD * 0.15;
+
+    // Detect contiguous segments above threshold (= number clusters)
+    const clusters = [];
+    const minW = Math.floor(sw * 0.025); // ignore clusters narrower than 2.5% of width
+    let inCl = false, clStart = 0;
+    for (let x = 0; x < sw; x++) {
+        if (!inCl && smoothed[x] > threshold) {
+            inCl = true; clStart = x;
+        } else if (inCl && (smoothed[x] <= threshold || x === sw - 1)) {
+            if (x - clStart >= minW) clusters.push({ x0: clStart, x1: x });
+            inCl = false;
+        }
+    }
+
+    // If more than 3 clusters, merge by splitting at the 2 widest inter-cluster gaps
+    if (clusters.length > 3) {
+        const gaps = [];
+        for (let i = 0; i < clusters.length - 1; i++)
+            gaps.push({ i, w: clusters[i+1].x0 - clusters[i].x1 });
+        gaps.sort((a, b) => b.w - a.w);
+        const divs = [gaps[0].i, gaps[1].i].sort((a, b) => a - b);
+        const merge = arr => ({ x0: arr[0].x0, x1: arr[arr.length-1].x1 });
+        const g = [
+            merge(clusters.slice(0, divs[0]+1)),
+            merge(clusters.slice(divs[0]+1, divs[1]+1)),
+            merge(clusters.slice(divs[1]+1))
+        ];
+        clusters.length = 0;
+        clusters.push(...g);
+    }
+
+    console.log(`📏 findTroopColumns: ${clusters.length} cluster(s)`,
+        clusters.map(cl => `${(cl.x0/sw*100).toFixed(0)}%–${(cl.x1/sw*100).toFixed(0)}%`));
+
+    if (clusters.length !== 3) return null;
+
+    // Return [L0,L1, M0,M1, R0,R1] with 1% padding on each side
+    const pad = Math.max(0.005, 1 / sw);
+    return [
+        Math.max(0,   clusters[0].x0/sw - pad), Math.min(1, clusters[0].x1/sw + pad),
+        Math.max(0,   clusters[1].x0/sw - pad), Math.min(1, clusters[1].x1/sw + pad),
+        Math.max(0,   clusters[2].x0/sw - pad), Math.min(1, clusters[2].x1/sw + pad)
+    ];
+}
+
 /* ─── صورة بـ Otsu binarization (أنظف بكثير من CSS contrast) ─── */
 function makeOtsuImage(file, scale, cropTop, cropBottom) {
     return new Promise((resolve, reject) => {
@@ -735,14 +851,15 @@ function makeOtsuImage(file, scale, cropTop, cropBottom) {
             for (let i = 0; i < len; i++)
                 gray[i] = Math.round(0.299*d[i*4] + 0.587*d[i*4+1] + 0.114*d[i*4+2]);
 
-            // Otsu threshold
-            const thr = otsuThreshold(gray);
+            // Gaussian blur → Otsu threshold (blur reduces compression artifacts)
+            const blurred = gaussianBlur3x3(gray, W, H);
+            const thr = otsuThreshold(blurred);
             console.log(`🎯 Otsu threshold=${thr} (crop ${ct}-${cb})`);
 
             // تطبيق العتبة + عدّ البكسلات الداكنة
             let darkCount = 0;
             for (let i = 0; i < len; i++) {
-                const val = gray[i] > thr ? 255 : 0;
+                const val = blurred[i] > thr ? 255 : 0;
                 d[i*4] = d[i*4+1] = d[i*4+2] = val;
                 if (val === 0) darkCount++;
             }
@@ -752,6 +869,18 @@ function makeOtsuImage(file, scale, cropTop, cropBottom) {
                 for (let i = 0; i < len; i++)
                     d[i*4] = d[i*4+1] = d[i*4+2] = 255 - d[i*4];
                 console.log("🔄 Inverted (dark bg)");
+            }
+
+            // احتياطي لخلفيات منخفضة التباين: إذا Otsu أفسد النص → استخدم فلتر CSS
+            const finalDark = darkCount > len * 0.5 ? len - darkCount : darkCount;
+            if (finalDark / len < 0.05) {
+                console.log(`⚠️ makeOtsuImage: darkPct=${(finalDark/len*100).toFixed(1)}% < 5% → CSS filter fallback`);
+                canvas.width = W; canvas.height = H;
+                ctx.filter = 'grayscale(1) contrast(3)';
+                ctx.drawImage(img, 0, sY, img.width, sH, 0, 0, W, H);
+                ctx.filter = 'none';
+                canvas.toBlob(blob => { resolve(blob); URL.revokeObjectURL(img.src); }, 'image/png');
+                return;
             }
 
             ctx.putImageData(imgData, 0, 0);
@@ -808,10 +937,11 @@ function makeNumberImage(file, scale, top, bottom, left, right) {
             const gray = new Uint8Array(len);
             for (let i = 0; i < len; i++)
                 gray[i] = Math.round(0.299*d[i*4] + 0.587*d[i*4+1] + 0.114*d[i*4+2]);
-            const thr = otsuThreshold(gray);
+            const blurred = gaussianBlur3x3(gray, W, H);
+            const thr = otsuThreshold(blurred);
             let darkCount = 0;
             for (let i = 0; i < len; i++) {
-                const val = gray[i] > thr ? 255 : 0;
+                const val = blurred[i] > thr ? 255 : 0;
                 d[i*4] = d[i*4+1] = d[i*4+2] = val;
                 if (val === 0) darkCount++;
             }
@@ -819,7 +949,17 @@ function makeNumberImage(file, scale, top, bottom, left, right) {
                 for (let i = 0; i < len; i++)
                     d[i*4] = d[i*4+1] = d[i*4+2] = 255 - d[i*4];
             }
-            ctx.putImageData(imgData, 0, 0);
+            // احتياطي لخلفيات منخفضة التباين: إذا Otsu أفسد النص → استخدم فلتر CSS
+            const finalDark = darkCount > len * 0.5 ? len - darkCount : darkCount;
+            if (finalDark / len < 0.05) {
+                console.log(`⚠️ makeNumberImage: darkPct=${(finalDark/len*100).toFixed(1)}% < 5% → CSS filter fallback`);
+                c1.width = W; c1.height = H;
+                ctx.filter = 'grayscale(1) contrast(3)';
+                ctx.drawImage(img, sX, sY, sW, sH, 0, 0, W, H);
+                ctx.filter = 'none';
+            } else {
+                ctx.putImageData(imgData, 0, 0);
+            }
             // إضافة حشوة بيضاء (يساعد Tesseract على قراءة الحواف)
             const pad = 30;
             const c2 = document.createElement('canvas');
@@ -897,19 +1037,43 @@ function cleanTroopWord(raw) {
 
 /* --- استخراج ذكي: باستخدام مواقع الكلمات (bbox) للعثور على 3 أرقام على نفس الصف --- */
 function extractTroopsFromWords(words, imgHeight) {
-    const troopWords = [];
-    for (const w of (words || [])) {
-        if ((w.confidence || 0) < 15) continue;
-        const cleaned = cleanTroopWord(w.text);
-        if (cleaned) {
-            troopWords.push({ ...w, cleanVal: cleaned });
+    // Step 1: filter by confidence (raised from 15 → 35)
+    const rawWords = (words || []).filter(w => (w.confidence || 0) >= 35);
+
+    // Step 2: sort by position (top→bottom, left→right) for adjacency scan
+    rawWords.sort((a, b) => a.bbox.y0 - b.bbox.y0 || a.bbox.x0 - b.bbox.x0);
+
+    // Step 3: merge horizontally adjacent fragments on the same row
+    // e.g. Tesseract splits "1.1m" into ["1.", "1m"] — merge them first
+    const mergedWords = [];
+    for (const w of rawWords) {
+        const prev = mergedWords[mergedWords.length - 1];
+        const sameRow  = prev && Math.abs(w.bbox.y0 - prev.bbox.y0) < 20;
+        const adjacent = prev && (w.bbox.x0 - (prev.bbox.x1 || prev.bbox.x0)) < 20;
+        if (sameRow && adjacent) {
+            mergedWords[mergedWords.length - 1] = {
+                ...prev,
+                text: prev.text + w.text,
+                bbox: { x0: prev.bbox.x0, y0: prev.bbox.y0,
+                        x1: w.bbox.x1, y1: Math.max(prev.bbox.y1||0, w.bbox.y1||0) },
+                confidence: Math.min(prev.confidence, w.confidence)
+            };
+        } else {
+            mergedWords.push({ ...w });
         }
+    }
+
+    // Step 4: apply cleanTroopWord and plausibility filter
+    const troopWords = [];
+    for (const w of mergedWords) {
+        const cleaned = cleanTroopWord(w.text);
+        if (cleaned) troopWords.push({ ...w, cleanVal: cleaned });
     }
 
     if (troopWords.length < 2) return null;
 
+    // Step 5: group into rows by Y proximity
     troopWords.sort((a, b) => a.bbox.y0 - b.bbox.y0);
-
     const yTol = Math.max(40, imgHeight * 0.04);
     const rows = [];
     let currentRow = [troopWords[0]];
@@ -925,11 +1089,13 @@ function extractTroopsFromWords(words, imgHeight) {
 
     console.log("🔍 صفوف:", rows.map(r => r.map(w => w.cleanVal + '(' + Math.round(w.confidence) + ')')));
 
-    // 🏆 صف بـ 3 أرقام
-    let best = rows.find(r => r.length === 3);
-    // أو: صف بـ 2 رقم (الثالث = 0)
-    if (!best) best = rows.find(r => r.length === 2);
-    if (!best) return null;
+    // Step 6: pick best row — prefer 3-word rows with plausible values
+    rows.sort((a, b) => {
+        const scoreRow = r => r.filter(w => isPlausible(w.cleanVal)).length * 10 + r.length;
+        return scoreRow(b) - scoreRow(a);
+    });
+    const best = rows[0];
+    if (!best || best.length < 2) return null;
 
     // ترتيب من يسار لليمين = قناص ← مقاتل ← جوال
     best.sort((a, b) => a.bbox.x0 - b.bbox.x0);
@@ -938,7 +1104,7 @@ function extractTroopsFromWords(words, imgHeight) {
 
     return {
         sniper:  vals[0], fighter: vals[1], cavalry: vals[2],
-        words: best // نحفظ الكلمات الأصلية للثقة
+        words: best
     };
 }
 
@@ -1008,6 +1174,13 @@ function extractFromData(data) {
 /* --- هل القيمة رقم قوات صالح (غير صفري)؟ --- */
 function isValidTroop(v) {
     return /^\d+\.?\d*[km]$/i.test((v||"").toLowerCase());
+}
+
+/* --- هل القيمة ضمن النطاق المنطقي لقوات اللعبة (10k–10m)؟ --- */
+function isPlausible(v) {
+    if (!isValidTroop(v)) return false;
+    const n = parseNum(v);
+    return n >= 10000 && n <= 10000000;
 }
 
 /* --- تصويت بالإجماع: اختيار أفضل قيمة لكل حقل من عدة نتائج --- */
@@ -1326,56 +1499,120 @@ async function handleImageUpload(event) {
             _i.src = URL.createObjectURL(file);
         });
 
-        // Auto-detect where the troop summary row is (replaces hardcoded 0.25–0.65)
+        // Auto-detect row Y, then column X boundaries
         const _rowY  = findTroopRowY(_imgEl);
-        const _halfH = 0.13;  // ±13% gives a taller band to catch numbers reliably
+        const _halfH = 0.13;
         const _top   = Math.max(0.05, _rowY - _halfH);
         const _bot   = Math.min(0.95, _rowY + _halfH);
-        console.log(`📐 Crop zone: top=${(_top*100).toFixed(0)}% bot=${(_bot*100).toFixed(0)}%`);
 
-        // Tight non-overlapping columns — no bleed between numbers
-        const [imgFull, imgL, imgM, imgR] = await Promise.all([
+        // Dynamic column detection — falls back to fixed boundaries if not found
+        const _cols = findTroopColumns(_imgEl, _rowY);
+        const [cL0, cL1, cM0, cM1, cR0, cR1] = _cols || [0.02, 0.36, 0.36, 0.67, 0.67, 0.98];
+        console.log(_cols
+            ? `📏 Dynamic cols: L=${(cL0*100).toFixed(0)}–${(cL1*100).toFixed(0)}% M=${(cM0*100).toFixed(0)}–${(cM1*100).toFixed(0)}% R=${(cR0*100).toFixed(0)}–${(cR1*100).toFixed(0)}%`
+            : '📏 Column detection failed — using fixed fallback');
+
+        // ① Prepare images: full image + 3 columns × 3 scales (for majority voting)
+        const [imgFull,
+               imgL3, imgL4, imgL5,
+               imgM3, imgM4, imgM5,
+               imgR3, imgR4, imgR5] = await Promise.all([
             makeOtsuImage(file, 4),
-            makeNumberImage(file, 4, _top, _bot, 0.02, 0.36),
-            makeNumberImage(file, 4, _top, _bot, 0.36, 0.67),
-            makeNumberImage(file, 4, _top, _bot, 0.67, 0.98)
+            makeNumberImage(file, 3, _top, _bot, cL0, cL1),
+            makeNumberImage(file, 4, _top, _bot, cL0, cL1),
+            makeNumberImage(file, 5, _top, _bot, cL0, cL1),
+            makeNumberImage(file, 3, _top, _bot, cM0, cM1),
+            makeNumberImage(file, 4, _top, _bot, cM0, cM1),
+            makeNumberImage(file, 5, _top, _bot, cM0, cM1),
+            makeNumberImage(file, 3, _top, _bot, cR0, cR1),
+            makeNumberImage(file, 4, _top, _bot, cR0, cR1),
+            makeNumberImage(file, 5, _top, _bot, cR0, cR1)
         ]);
 
-        // ② قراءة OCR: صورة كاملة + 3 أرقام بالتوازي
+        // ② OCR: full image + 9 column crops (3 per column × 3 scales) in parallel
         if (loadText) loadText.innerText = "🔍 قراءة القوات...";
-        // pageseg_mode 8 = single word — better for isolated number crops than mode 7
         const numParams = {
             tessedit_char_whitelist: '0123456789.kKmM',
             tessedit_pageseg_mode: '8'
         };
-        const [dataFull, dL, dM, dR] = await Promise.all([
+        const [dataFull,
+               dL3, dL4, dL5,
+               dM3, dM4, dM5,
+               dR3, dR4, dR5] = await Promise.all([
             runOCRPass(imgFull, { tessedit_pageseg_mode: '11' }, m => {
                 if (m.status === 'recognizing text' && loadText)
                     loadText.innerText = `🔍 ${Math.round((m.progress||0)*100)}%`;
             }),
-            runOCRPass(imgL, numParams, ()=>{}),
-            runOCRPass(imgM, numParams, ()=>{}),
-            runOCRPass(imgR, numParams, ()=>{})
+            runOCRPass(imgL3, numParams, ()=>{}),
+            runOCRPass(imgL4, numParams, ()=>{}),
+            runOCRPass(imgL5, numParams, ()=>{}),
+            runOCRPass(imgM3, numParams, ()=>{}),
+            runOCRPass(imgM4, numParams, ()=>{}),
+            runOCRPass(imgM5, numParams, ()=>{}),
+            runOCRPass(imgR3, numParams, ()=>{}),
+            runOCRPass(imgR4, numParams, ()=>{}),
+            runOCRPass(imgR5, numParams, ()=>{})
         ]);
 
-        console.log("═══════════════════════════════════════");
-        console.log("🔍 Left:", dL.text.trim(), "| Center:", dM.text.trim(), "| Right:", dR.text.trim());
-        console.log("═══════════════════════════════════════");
+        // Majority vote across 3 scales for each column
+        function voteColumn(reads, label) {
+            const vals = reads.map(d => cleanTroopWord(d.text) || '0');
+            console.log(`🗳️ ${label} votes:`, vals);
+            const counts = {};
+            for (const v of vals) counts[v] = (counts[v]||0) + 1;
+            // Prefer the most frequent non-zero plausible value; fall back to any non-zero
+            let best = '0';
+            let bestScore = -1;
+            for (const [v, c] of Object.entries(counts)) {
+                const score = c * 10 + (isPlausible(v) ? 5 : 0) + (isValidTroop(v) ? 2 : 0);
+                if (score > bestScore) { best = v; bestScore = score; }
+            }
+            return best;
+        }
 
+        console.log("═══════════════════════════════════════");
         // ③ استخراج القوات
         const parsedFull = extractFromData(dataFull);
-        // ترتيب الأعمدة في تقرير الاستطلاع من اليسار: قناص | مقاتل | جوال
-        // (اليسار = sniper، الوسط = fighter/inf، اليمين = cavalry)
+        // Column vote: left=sniper, center=fighter, right=cavalry
         const perNum = {
-            sniper:  cleanTroopWord(dL.text) || '0',
-            fighter: cleanTroopWord(dM.text) || '0',
-            cavalry: cleanTroopWord(dR.text) || '0'
+            sniper:  voteColumn([dL3, dL4, dL5], 'L'),
+            fighter: voteColumn([dM3, dM4, dM5], 'M'),
+            cavalry: voteColumn([dR3, dR4, dR5], 'R')
         };
         const headerTotal = extractHeaderTotal(dataFull.text);
 
         console.log("📊 Full:", JSON.stringify(parsedFull));
         console.log("📊 Per-number:", JSON.stringify(perNum));
         console.log("📊 Header total:", headerTotal);
+
+        // ③b Wide-crop retry: if a column returned "0" but headerTotal says troops exist,
+        //     expand the crop X by ±5% and try one more OCR pass for that column only
+        if (headerTotal > 0) {
+            const _colBounds = {
+                sniper:  [cL0, cL1],
+                fighter: [cM0, cM1],
+                cavalry: [cR0, cR1]
+            };
+            const _retryFields = ['sniper','fighter','cavalry'].filter(f => perNum[f] === '0');
+            if (_retryFields.length > 0) {
+                console.log('🔁 Wide-crop retry for:', _retryFields);
+                if (loadText) loadText.innerText = '🔁 توسيع المنطقة...';
+                const _retryP = { tessedit_char_whitelist: '0123456789.kKmM', tessedit_pageseg_mode: '8' };
+                await Promise.all(_retryFields.map(async f => {
+                    const [x0, x1] = _colBounds[f];
+                    const blob = await makeNumberImage(file, 4, _top, _bot,
+                                                       Math.max(0, x0 - 0.05),
+                                                       Math.min(1, x1 + 0.05));
+                    const rd  = await runOCRPass(blob, _retryP, ()=>{});
+                    const val = cleanTroopWord(rd.text);
+                    if (isPlausible(val)) {
+                        console.log(`🔁 ${f}: wide retry → "${val}"`);
+                        perNum[f] = val;
+                    }
+                }));
+                console.log("📊 After retry:", JSON.stringify(perNum));
+            }
+        }
 
         // ④ تقييم ومقارنة النتائج
         if (loadText) loadText.innerText = "🧠 مقارنة النتائج...";
@@ -1384,8 +1621,9 @@ async function handleImageUpload(event) {
             let s = 0;
             const vals = [r?.fighter||'0', r?.sniper||'0', r?.cavalry||'0'];
             for (const v of vals) {
-                if (isValidTroop(v)) s += 3;
-                else if (v === '0') s += 1;
+                if (isPlausible(v))        s += 4; // valid AND in expected 10k–10m range
+                else if (isValidTroop(v))  s += 2; // valid format but out of range
+                else if (v === '0')        s += 1;
             }
             if (headerTotal > 0) {
                 const sum = vals.reduce((a, v) => a + parseNum(v), 0);
