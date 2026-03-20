@@ -1,0 +1,40 @@
+{
+  "name": "Daly Alpha - Smart Battle Calculator",
+  "short_name": "Daly Alpha",
+  "description": "Calculate the optimal troop composition for attacking enemy camps in strategy games",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#f8f9fa",
+  "theme_color": "#d97706",
+  "orientation": "portrait-primary",
+  "scope": "./",
+  "lang": "ar",
+  "dir": "auto",
+  "categories": ["games", "utilities"],
+  "icons": [
+    {
+      "src": "images/camp.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "images/camp.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "screenshots": [],
+  "shortcuts": [
+    {
+      "name": "Calculate",
+      "short_name": "Calc",
+      "description": "Open calculator",
+      "url": "./index.html",
+      "icons": [{ "src": "images/camp.png", "sizes": "192x192" }]
+    }
+  ],
+  "prefer_related_applications": false,
+  "related_applications": []
+}

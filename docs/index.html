@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  
+  <!-- Primary Meta Tags -->
+  <title>Daly Alpha - Smart Battle Calculator</title>
+  <meta name="title" content="Daly Alpha - Smart Battle Calculator">
+  <meta name="description" content="Calculate the optimal troop composition for attacking enemy camps. Smart AI-powered analysis for strategy games.">
+  <meta name="keywords" content="daly, alpha, calculator, troops, strategy, game, battle, composition">
+  <meta name="author" content="F11">
+  <meta name="robots" content="index, follow">
+  
+  <!-- Open Graph / Facebook -->
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="">
+  <meta property="og:title" content="Daly Alpha - Smart Battle Calculator">
+  <meta property="og:description" content="Calculate the optimal troop composition for attacking enemy camps.">
+  <meta property="og:image" content="images/camp.png">
+  
+  <!-- Twitter -->
+  <meta property="twitter:card" content="summary">
+  <meta property="twitter:title" content="Daly Alpha - Smart Battle Calculator">
+  <meta property="twitter:description" content="Calculate the optimal troop composition for attacking enemy camps.">
+  <meta property="twitter:image" content="images/camp.png">
+  
+  <!-- PWA -->
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#d97706">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Daly Alpha">
+  <link rel="apple-touch-icon" href="images/camp.png">
+  
+  <!-- Favicon -->
+  <link rel="icon" type="image/png" href="images/camp.png">
+  <link rel="shortcut icon" type="image/png" href="images/camp.png">
+  
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800;900&display=swap" rel="stylesheet">
+  
+  <!-- Styles -->
+  <link rel="stylesheet" href="css/styles.css">
+  
+  <!-- Preload critical assets -->
+  <link rel="preload" href="images/camp.png" as="image">
+</head>
+
+<body>
+  <div class="app-container">
+    
+    <!-- ==================== TOP BAR ==================== -->
+    <header class="topbar">
+      <div class="lang-switcher" role="group" aria-label="Language">
+        <button class="lang-btn" data-lang="ar" type="button" aria-label="Arabic">AR</button>
+        <button class="lang-btn" data-lang="en" type="button" aria-label="English">EN</button>
+        <button class="lang-btn" data-lang="pt" type="button" aria-label="Portuguese">PT</button>
+      </div>
+      <button class="theme-toggle" id="themeToggle" type="button" aria-label="Toggle theme">Dark</button>
+    </header>
+    
+    <!-- ==================== HERO ==================== -->
+    <section class="hero">
+      <div class="hero-image-container">
+        <img src="images/camp.png" alt="Daly Camp" class="hero-image" loading="eager">
+      </div>
+      <div class="logo">
+        <span class="logo-text" id="logoText">Daly</span>
+        <span class="logo-badge">ALPHA</span>
+      </div>
+      <p class="tagline" id="tagline">Your smart troop composition calculator</p>
+      <div class="hint" id="hint">
+        Enter numbers like: <span class="hint-pill">360k</span> <span class="hint-pill">1.1m</span>
+      </div>
+    </section>
+    
+    <!-- ==================== ONBOARDING ==================== -->
+    <div class="onboarding hidden" id="onboarding" role="alert">
+      <div class="onboarding-icon" aria-hidden="true">&#x1F44B;</div>
+      <div class="onboarding-content">
+        <h2 class="onboarding-title" id="onboardingTitle">Welcome to Daly Alpha!</h2>
+        <p class="onboarding-text" id="onboardingText">Enter enemy troop counts and we'll calculate the best attack composition</p>
+      </div>
+      <button class="onboarding-dismiss" id="onboardingDismiss" type="button" aria-label="Dismiss">&times;</button>
+    </div>
+    
+    <!-- ==================== NEWS TICKER ==================== -->
+    <div class="ticker" id="ticker" role="marquee" aria-live="polite">
+      <div class="ticker-badge" id="tickerBadge">NEW</div>
+      <div class="ticker-track">
+        <div class="ticker-inner">
+          <span class="ticker-text">Tip: Use the camera to automatically read scout reports</span>
+          <span class="ticker-text">Tip: Use the camera to automatically read scout reports</span>
+        </div>
+      </div>
+      <button class="ticker-dismiss" id="tickerDismiss" type="button" aria-label="Dismiss">&times;</button>
+    </div>
+    
+    <!-- ==================== MAIN CARD ==================== -->
+    <main class="main-card">
+      
+      <!-- Loading Overlay -->
+      <div class="loading-overlay" id="loadingOverlay" role="alert" aria-busy="true">
+        <div class="spinner" aria-hidden="true"></div>
+        <div class="loading-text" id="loadingText">Analyzing image...</div>
+      </div>
+      
+      <!-- ========== UPLOAD SECTION ========== -->
+      <section class="upload-section" aria-labelledby="uploadLabel">
+        <div class="section-label" id="uploadLabel">Upload Scout Report</div>
+
+        <div class="upload-shell">
+          <input class="upload-input" id="uploadInput" type="file" accept="image/*" aria-label="Choose image">
+
+          <!-- Scout upload card -->
+          <div class="scout-card" id="scoutCard">
+            <div class="scout-media">
+              <video
+                id="scoutVideo"
+                class="scout-video"
+                autoplay
+                muted
+                loop
+                playsinline
+                webkit-playsinline
+                preload="auto"
+                style="width:100%;height:100%;object-fit:cover;object-position:center top;border-radius:inherit;">
+                <source src="assets/gallery/FS1.mp4" type="video/mp4">
+              </video>
+              <script>
+              (function(){
+                var v = document.getElementById('scoutVideo');
+                if(!v) return;
+                function tryPlay(){
+                  v.play().catch(function(){
+                    document.addEventListener('touchstart', function(){
+                      v.play();
+                    }, {once: true});
+                  });
+                }
+                if(v.readyState >= 2){
+                  tryPlay();
+                } else {
+                  v.addEventListener('loadeddata', tryPlay);
+                  v.addEventListener('canplay', tryPlay);
+                }
+              })();
+              </script>
+              <img class="scout-img" id="scoutImg" src="" alt="Preview">
+            </div>
+            <div class="scout-overlay"></div>
+            <div class="scout-corner sc-tl"></div>
+            <div class="scout-corner sc-tr"></div>
+            <div class="scout-corner sc-bl"></div>
+            <div class="scout-corner sc-br"></div>
+
+            <!-- Upload bar: shown when no image selected -->
+            <div class="scout-bar scout-bar--upload">
+              <div class="scout-bar-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24">
+                  <path class="scout-icon-path" d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                  <path class="scout-icon-path" d="m17 8-5-5-5 5"/>
+                  <path class="scout-icon-path" d="M12 3v12"/>
+                </svg>
+              </div>
+              <button class="scout-upload-btn" id="uploadCta" type="button">
+                <span id="uploadCtaPill">تحميل صورة</span>
+              </button>
+            </div>
+
+            <!-- Preview bar: shown after image selection -->
+            <div class="scout-bar scout-bar--preview">
+              <button class="scout-action-btn" id="uploadReplaceBtn" type="button">استبدال</button>
+              <button class="scout-action-btn scout-action-btn--danger" id="uploadRemoveBtn" type="button">إزالة</button>
+            </div>
+          </div>
+
+          <!-- Hidden: uploadThumb src is read by the download button -->
+          <div class="upload-preview" id="uploadPreview" role="status" aria-live="polite">
+            <img class="upload-preview-thumb" id="uploadThumb" src="" alt="Preview">
+            <div class="upload-preview-info">
+              <div class="upload-preview-name" id="uploadFileName">—</div>
+              <div class="upload-preview-size" id="uploadFileSize">—</div>
+              <div class="upload-preview-status" id="uploadStatus">—</div>
+            </div>
+          </div>
+        </div>
+      </section>
+      
+      <!-- ========== INPUT FIELDS ========== -->
+      <section class="inputs-grid" aria-label="Enemy troop inputs">
+        <!-- Snipers -->
+        <div class="input-card">
+          <label class="input-label" for="inputSni">
+            <img src="images/sniper.png" alt="" class="input-icon" aria-hidden="true">
+            <span id="labelSni">Snipers</span>
+          </label>
+          <input type="text" class="input-field" id="inputSni" inputmode="text" autocomplete="off" placeholder="e.g. 360k">
+          <div class="input-footer">
+            <div class="input-validation" aria-live="polite"></div>
+            <button class="input-clear-btn" data-input="inputSni" type="button">&times; Clear</button>
+          </div>
+        </div>
+        
+        <!-- Fighters -->
+        <div class="input-card">
+          <label class="input-label" for="inputInf">
+            <img src="images/fighter.png" alt="" class="input-icon" aria-hidden="true">
+            <span id="labelInf">Fighters</span>
+          </label>
+          <input type="text" class="input-field" id="inputInf" inputmode="text" autocomplete="off" placeholder="e.g. 360k">
+          <div class="input-footer">
+            <div class="input-validation" aria-live="polite"></div>
+            <button class="input-clear-btn" data-input="inputInf" type="button">&times; Clear</button>
+          </div>
+        </div>
+        
+        <!-- Cavalry -->
+        <div class="input-card">
+          <label class="input-label" for="inputCav">
+            <img src="images/cavalry.png" alt="" class="input-icon" aria-hidden="true">
+            <span id="labelCav">Cavalry</span>
+          </label>
+          <input type="text" class="input-field" id="inputCav" inputmode="text" autocomplete="off" placeholder="e.g. 1.1m">
+          <div class="input-footer">
+            <div class="input-validation" aria-live="polite"></div>
+            <button class="input-clear-btn" data-input="inputCav" type="button">&times; Clear</button>
+          </div>
+        </div>
+      </section>
+      
+      <!-- ========== SAVED CAMPS ========== -->
+      <section class="camps-section" id="campsSection" aria-labelledby="campsTitle">
+        <div class="camps-header" id="campsHeader" role="button" tabindex="0" aria-expanded="false">
+          <div class="camps-icon" aria-hidden="true">&#x1F4C1;</div>
+          <div class="camps-info">
+            <div class="camps-title" id="campsTitle">Saved Camps</div>
+            <div class="camps-subtitle" id="campsSubtitle">Save & load numbers instantly</div>
+          </div>
+          <div class="camps-count" id="campsCount" aria-label="Number of saved camps">0</div>
+          <div class="camps-arrow" aria-hidden="true">&#x25BC;</div>
+        </div>
+        <div class="camps-body" aria-hidden="true">
+          <div class="camps-save-row">
+            <input type="text" class="camps-name-input" id="campNameInput" placeholder="Camp name..." maxlength="30">
+            <button class="camps-save-btn" id="campSaveBtn" type="button">&#x1F4BE; Save</button>
+          </div>
+          <div class="camps-list" id="campsList" role="list"></div>
+        </div>
+      </section>
+      
+      <!-- ========== ACTION BUTTONS ========== -->
+      <section class="actions" aria-label="Actions">
+        <div class="actions-primary">
+          <button class="btn btn-primary" id="btnCalc" type="button">
+            <span aria-hidden="true">&#x2694;</span>
+            <span>Calculate Best Composition</span>
+          </button>
+          <button class="btn btn-smart" id="btnSmart" type="button">
+            <span aria-hidden="true">&#x1F9E0;</span>
+            <span>Smart Analysis</span>
+          </button>
+        </div>
+        <div class="actions-secondary">
+          <button class="btn btn-secondary" id="btnCopy" type="button">
+            <span aria-hidden="true">&#x1F4CB;</span>
+            <span>Copy</span>
+          </button>
+          <button class="btn btn-secondary" id="btnShare" type="button">
+            <span aria-hidden="true">&#x1F517;</span>
+            <span>Share</span>
+          </button>
+          <button class="btn btn-danger" id="btnReset" type="button">
+            <span aria-hidden="true">&#x267B;</span>
+            <span>Reset</span>
+          </button>
+        </div>
+      </section>
+      
+      <!-- ========== OUTPUT ========== -->
+      <section class="output" id="output" aria-live="polite" aria-atomic="true">
+        <!-- Idle State -->
+        <div class="output-idle" id="outputIdle">
+          <div class="output-idle-icon" aria-hidden="true">&#x2694;</div>
+          <div>Enter enemy troops and press the button</div>
+        </div>
+        
+        <!-- Result State -->
+        <div class="result" id="resultSection">
+          <div class="result-header">
+            <div class="result-title">
+              <span aria-hidden="true">&#x1F3C6;</span>
+              <span id="resultTitle">Recommendation</span>
+            </div>
+            <button class="result-copy-btn" id="resultCopyBtn" type="button">Copy</button>
+          </div>
+          
+          <div class="result-enemy" id="enemyStats" aria-label="Enemy troops">
+            <!-- Populated by JS -->
+          </div>
+          
+          <div class="result-recommendation">
+            <div class="rec-title">
+              <span aria-hidden="true">&#x2705;</span>
+              <span id="recTitle">Best Attack Composition</span>
+            </div>
+            <div class="rec-troops" id="recTroops">
+              <!-- Populated by JS -->
+            </div>
+          </div>
+          
+          <div class="result-reason" id="resultReason">
+            <!-- Populated by JS -->
+          </div>
+        </div>
+        
+        <!-- Smart Analysis Box -->
+        <div class="smart-box" id="smartBox" aria-labelledby="smartTitle">
+          <!-- Populated by JS -->
+        </div>
+      </section>
+      
+      <!-- ========== CHART ========== -->
+      <section class="chart-section" id="chartSection" aria-label="Ratio chart">
+        <div class="chart-card">
+          <canvas id="chartCanvas" width="190" height="190" aria-hidden="true"></canvas>
+          <div class="chart-center">
+            <div class="chart-ratio" id="chartRatio">70 / 30</div>
+            <div class="chart-ratio-label" id="chartRatioLabel">Ideal Ratio</div>
+          </div>
+        </div>
+        <div class="chart-legend">
+          <div class="chart-legend-title" id="chartLegendTitle">Recommendation</div>
+          <div class="legend-row" id="legendA">
+            <div class="legend-left">
+              <span class="legend-dot"></span>
+              <img class="legend-icon" src="images/sniper.png" alt="">
+              <span class="legend-name">Snipers</span>
+            </div>
+            <div class="legend-pct">70%</div>
+          </div>
+          <div class="legend-row" id="legendB">
+            <div class="legend-left">
+              <span class="legend-dot"></span>
+              <img class="legend-icon" src="images/fighter.png" alt="">
+              <span class="legend-name">Fighters</span>
+            </div>
+            <div class="legend-pct">30%</div>
+          </div>
+        </div>
+      </section>
+      
+      <!-- ========== HISTORY ========== -->
+      <section class="history-section" id="historySection" style="display:none" aria-labelledby="historyTitle">
+        <div class="history-header">
+          <div class="history-title" id="historyTitle">
+            <span aria-hidden="true">&#x1F4DC;</span>
+            <span>History</span>
+          </div>
+          <button class="history-clear-btn" id="historyClearBtn" type="button">Clear All</button>
+        </div>
+        <div class="history-list" id="historyList" role="list">
+          <!-- Populated by JS -->
+        </div>
+      </section>
+      
+    </main>
+    
+    <!-- ==================== FOOTER ==================== -->
+    <footer class="footer">
+      <p id="footerText">This helper was created by <span class="footer-brand">F11</span></p>
+    </footer>
+    
+  </div>
+  
+  <!-- SVG gradient defs for dl-btn -->
+  <svg style="position:absolute;width:0;height:0;overflow:hidden" aria-hidden="true" focusable="false">
+    <defs>
+      <linearGradient id="goldGrad" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%"   stop-color="#fff0b0"/>
+        <stop offset="45%"  stop-color="#e8c84a"/>
+        <stop offset="100%" stop-color="#a07820"/>
+      </linearGradient>
+      <linearGradient id="blueGrad" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%"   stop-color="#a0c4ff"/>
+        <stop offset="45%"  stop-color="#4a90f0"/>
+        <stop offset="100%" stop-color="#1a4db0"/>
+      </linearGradient>
+    </defs>
+  </svg>
+
+  <!-- ==================== TOAST ==================== -->
+  <div class="toast" id="toast" role="alert" aria-live="assertive"></div>
+  
+  <!-- ==================== CONFIRM DIALOG ==================== -->
+  <div class="confirm-overlay" id="confirmOverlay" role="dialog" aria-modal="true" aria-labelledby="confirmTitle">
+    <div class="confirm-dialog">
+      <div class="confirm-icon" aria-hidden="true">&#x26A0;</div>
+      <h2 class="confirm-title" id="confirmTitle">Are you sure?</h2>
+      <p class="confirm-message" id="confirmMessage">This action cannot be undone.</p>
+      <div class="confirm-actions">
+        <button class="confirm-btn confirm-btn-cancel" id="confirmCancel" type="button">Cancel</button>
+        <button class="confirm-btn confirm-btn-confirm" id="confirmOk" type="button">Confirm</button>
+      </div>
+    </div>
+  </div>
+  
+  <!-- ==================== SCRIPTS ==================== -->
+  <!-- Tesseract.js is loaded on-demand in app.js when needed -->
+  <script src="js/app.js" defer></script>
+  <script src="assets/effects/desert-effects.js" defer></script>
+
+</body>
+</html>
