@@ -118,9 +118,37 @@
           <!-- Scout upload card -->
           <div class="scout-card" id="scoutCard">
             <div class="scout-media">
-              <video class="scout-video" autoplay muted loop playsinline>
+              <video
+                id="scoutVideo"
+                class="scout-video"
+                autoplay
+                muted
+                loop
+                playsinline
+                webkit-playsinline
+                preload="auto"
+                style="width:100%;height:100%;object-fit:cover;object-position:center top;border-radius:inherit;">
                 <source src="assets/gallery/FS1.mp4" type="video/mp4">
               </video>
+              <script>
+              (function(){
+                var v = document.getElementById('scoutVideo');
+                if(!v) return;
+                function tryPlay(){
+                  v.play().catch(function(){
+                    document.addEventListener('touchstart', function(){
+                      v.play();
+                    }, {once: true});
+                  });
+                }
+                if(v.readyState >= 2){
+                  tryPlay();
+                } else {
+                  v.addEventListener('loadeddata', tryPlay);
+                  v.addEventListener('canplay', tryPlay);
+                }
+              })();
+              </script>
               <img class="scout-img" id="scoutImg" src="" alt="Preview">
             </div>
             <div class="scout-overlay"></div>
