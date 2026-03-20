@@ -1,0 +1,21 @@
+{
+  "name": "Daly Alpha - Helper",
+  "short_name": "Daly Alpha",
+  "description": "أداة Daly Alpha الذكية لحساب أفضل هجوم والنسبة المثالية.",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#0f1115",
+  "theme_color": "#f59e0b",
+  "icons":[
+    {
+      "src": "camp.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "camp.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

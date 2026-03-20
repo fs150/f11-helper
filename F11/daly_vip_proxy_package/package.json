@@ -1,0 +1,20 @@
+{
+  "name": "daly-alpha-vip-proxy",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Daly Alpha with hidden Gemini key and short VIP activation codes.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "create-code": "node tools/generate-vip-code.js",
+    "list-codes": "node tools/list-vip-codes.js",
+    "revoke-code": "node tools/revoke-vip-code.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2"
+  }
+}

@@ -1,0 +1,640 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Daly Alpha</title>
+<!-- إعدادات تطبيق الهاتف (PWA) -->
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#8b0000">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Daly Alpha">
+<link rel="apple-touch-icon" href="camp.png">
+
+<!-- خط تجوال -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800;900&display=swap" rel="stylesheet">
+
+<!-- تحميل مكتبة الذكاء الاصطناعي -->
+<script src="https://unpkg.com/tesseract.js@5/dist/tesseract.min.js" async defer></script>
+
+<style>
+  :root {
+    /* ثيم الحرب الفاتح */
+    --bg-grad: linear-gradient(-45deg, #e2e8f0, #f1f5f9, #cbd5e1, #e2e8f0);
+    --card: rgba(255, 255, 255, 0.65);
+    --text: #1e293b;
+    --muted: #64748b;
+    --border: rgba(139, 0, 0, 0.15); 
+    --input: rgba(255, 255, 255, 0.7);
+    --input-focus: rgba(255, 255, 255, 1);
+    --out: rgba(248, 250, 252, 0.85);
+    --btn: #d4af37; 
+    --btn-hover: #b8962e;
+    --btnText: #ffffff;
+    --accent: #8b0000; 
+    --accent-glow: rgba(139, 0, 0, 0.3);
+    --shadow: rgba(0, 0, 0, 0.08);
+    --shadow-hover: rgba(0, 0, 0, 0.15);
+    --glass-blur: blur(16px);
+    --error-bg: rgba(254, 226, 226, 0.8);
+    --error-text: #b91c1c;
+  }
+  
+  body.dark {
+    /* ثيم الحرب الداكن */
+    --bg-grad: linear-gradient(-45deg, #020617, #0f172a, #171723, #000000);
+    --card: rgba(15, 23, 42, 0.55);
+    --text: #f8fafc;
+    --muted: #94a3b8;
+    --border: rgba(212, 175, 55, 0.2); 
+    --input: rgba(0, 0, 0, 0.5);
+    --input-focus: rgba(0, 0, 0, 0.8);
+    --out: rgba(15, 23, 42, 0.7);
+    --btn: #d4af37;
+    --btn-hover: #fbbf24;
+    --btnText: #020617;
+    --accent: #be123c; 
+    --accent-glow: rgba(190, 18, 60, 0.4);
+    --shadow: rgba(0, 0, 0, 0.5);
+    --shadow-hover: rgba(0, 0, 0, 0.7);
+    --error-bg: rgba(69, 10, 10, 0.8);
+    --error-text: #fca5a5;
+  }
+
+  body { 
+    font-family: 'Tajawal', Arial, sans-serif; 
+    margin: 0; padding: 0; 
+    background: var(--bg-grad);
+    background-size: 400% 400%;
+    animation: gradientBG 15s ease infinite;
+    color: var(--text); 
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+  
+  @keyframes gradientBG {
+    0% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+  }
+  
+  /* حركة تنفس الموجة في الخلفية */
+  .bg-wave {
+    position: fixed; top: 0; left: 0; width: 100%; height: auto; z-index: 0; pointer-events: none; opacity: 0.8;
+    animation: waveSway 10s ease-in-out infinite alternate;
+  }
+  @keyframes waveSway {
+    0% { transform: translateY(0) scaleY(1); }
+    100% { transform: translateY(15px) scaleY(1.05); }
+  }
+
+  .container {
+    max-width: 760px; margin: 0 auto; padding: 20px 14px; position: relative; z-index: 2;
+  }
+
+  /* --- الهيدر الثابت الزجاجي --- */
+  .topbar { 
+    position: sticky; top: 0; z-index: 100;
+    display: flex; align-items: center; justify-content: space-between; 
+    padding: 12px 20px; margin: -20px -14px 20px -14px;
+    background: var(--card);
+    backdrop-filter: var(--glass-blur);
+    -webkit-backdrop-filter: var(--glass-blur);
+    border-bottom: 1px solid var(--border);
+    box-shadow: 0 4px 20px var(--shadow);
+    border-radius: 0 0 24px 24px;
+    transition: all 0.4s ease;
+  }
+
+  .tabs-nav {
+    display: flex; gap: 8px; background: var(--input); padding: 4px; border-radius: 16px; border: 1px solid var(--border);
+    transition: all 0.3s ease;
+  }
+  .tab-btn {
+    padding: 8px 16px; border: none; background: transparent; color: var(--muted); font-family: inherit; font-weight: 800; font-size: 14px; border-radius: 12px; cursor: pointer; 
+    transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  .tab-btn:hover { color: var(--text); transform: scale(1.05); }
+  .tab-btn.active { background: var(--accent); color: white; box-shadow: 0 4px 12px var(--accent-glow); transform: scale(1); }
+  
+  .tab-content { display: none; }
+  .tab-content.active { display: block; animation: smoothEnter 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+
+  .header-actions { display: flex; gap: 8px; }
+  .icon-btn {
+    width: 40px; height: 40px; border-radius: 14px; border: 1px solid var(--border); background: var(--input);
+    color: var(--text); display: flex; align-items: center; justify-content: center; cursor: pointer; 
+    transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1); font-size: 18px;
+  }
+  .icon-btn:hover { transform: scale(1.15) rotate(10deg); border-color: var(--btn); box-shadow: 0 4px 15px var(--shadow); }
+
+  /* --- انيميشن الدخول السينمائي (Smooth Enter) --- */
+  @keyframes smoothEnter {
+    0% { opacity: 0; transform: translateY(40px) scale(0.95); filter: blur(8px); }
+    100% { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); }
+  }
+  .stagger-1 { opacity: 0; animation: smoothEnter 0.8s cubic-bezier(0.16, 1, 0.3, 1) 0.1s forwards; }
+  .stagger-2 { opacity: 0; animation: smoothEnter 0.8s cubic-bezier(0.16, 1, 0.3, 1) 0.2s forwards; }
+  .stagger-3 { opacity: 0; animation: smoothEnter 0.8s cubic-bezier(0.16, 1, 0.3, 1) 0.3s forwards; }
+
+  /* --- البطل وجزيئات الذهب --- */
+  .hero-container { text-align: center; margin: 10px auto 30px; position: relative; z-index: 1; display: flex; justify-content: center; }
+  .particles { position: absolute; width: 100%; height: 100%; top: 0; left: 0; z-index: -1; pointer-events: none; }
+  .particle { position: absolute; width: 6px; height: 6px; background: var(--btn); border-radius: 50%; box-shadow: 0 0 12px var(--btn); animation: floatUp 4s infinite ease-in-out; opacity: 0; }
+  .particle:nth-child(1) { left: 20%; animation-delay: 0s; animation-duration: 4s; }
+  .particle:nth-child(2) { left: 50%; animation-delay: 1.5s; animation-duration: 5s; }
+  .particle:nth-child(3) { left: 80%; animation-delay: 0.5s; animation-duration: 3.5s; }
+  @keyframes floatUp {
+    0% { transform: translateY(20px) scale(0.5); opacity: 0; }
+    50% { opacity: 0.8; }
+    100% { transform: translateY(-80px) scale(1.2); opacity: 0; }
+  }
+  .hero-container::before { content: ""; position: absolute; width: 220px; height: 220px; background: radial-gradient(circle, var(--accent-glow) 0%, transparent 65%); border-radius: 50%; z-index: -1; animation: pulseGlow 4s infinite alternate ease-in-out; filter: blur(20px); }
+  .hero-image { max-width: 250px; filter: drop-shadow(0 20px 30px rgba(0,0,0,0.4)); animation: floatCamp 6s ease-in-out infinite; pointer-events: none; transition: filter 0.5s; }
+  .hero-image:hover { filter: drop-shadow(0 20px 40px rgba(212,175,55,0.4)); }
+  @keyframes floatCamp { 0%, 100% { transform: translateY(0) rotate(0deg); } 50% { transform: translateY(-15px) rotate(1deg); } }
+  @keyframes pulseGlow { from { transform: scale(0.8); opacity: 0.5; } to { transform: scale(1.3); opacity: 1; } }
+
+  /* --- شعار Alpha الفخم --- */
+  h2#title { display: flex; align-items: center; justify-content: center; gap: 12px; margin: 0 0 25px; position: relative; z-index: 2; transition: transform 0.4s; }
+  h2#title:hover { transform: scale(1.02); }
+  .daly-text { font-size: 44px; font-weight: 900; color: var(--text); letter-spacing: -1px; text-shadow: 0 4px 15px var(--shadow); }
+  .alpha-badge { position: relative; font-size: 14px; font-weight: 900; text-transform: uppercase; letter-spacing: 3px; padding: 6px 14px; border-radius: 12px; background: linear-gradient(135deg, var(--accent), #ff0000); color: white; box-shadow: 0 6px 20px var(--accent-glow), inset 0 2px 4px rgba(255,255,255,0.3); overflow: hidden; }
+  .alpha-badge::before { content: ''; position: absolute; top: 0; left: -100%; width: 50%; height: 100%; background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.8), transparent); transform: skewX(-20deg); animation: badgeShine 3s infinite; }
+  @keyframes badgeShine { 0% { left: -100%; } 20%, 100% { left: 200%; } }
+
+  .muted { color: var(--muted); font-size: 15px; text-align: center; margin-bottom: 20px; font-weight: 700; }
+
+  /* --- Glassmorphism للبطاقات الأساسية --- */
+  .box { 
+    background: var(--card); border: 1px solid var(--border); border-radius: 24px; padding: 24px; margin: 10px 0; 
+    box-shadow: 0 15px 35px var(--shadow), inset 0 0 0 1px rgba(255,255,255,0.1); 
+    backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur);
+    transition: box-shadow 0.4s ease, transform 0.4s ease;
+  }
+  .box:hover { box-shadow: 0 20px 45px var(--shadow-hover), inset 0 0 0 1px rgba(255,255,255,0.2); }
+
+  /* --- قسم الرفع الجديد --- */
+  .upload-section { margin-bottom: 25px; }
+  .upload-btns { display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; }
+  .upload-btn {
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 20px 10px;
+    border-radius: 20px; border: 2px dashed var(--border); background: var(--input); cursor: pointer; 
+    transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1); position: relative; overflow: hidden;
+  }
+  .upload-btn input[type="file"] { position: absolute; inset: 0; opacity: 0; cursor: pointer; z-index: 5; }
+  .upload-btn:hover { transform: translateY(-6px) scale(1.02); border-color: var(--accent); background: var(--card); box-shadow: 0 15px 30px var(--shadow-hover); }
+  .upload-btn-icon { width: 50px; height: 50px; border-radius: 14px; display: flex; align-items: center; justify-content: center; transition: transform 0.5s cubic-bezier(0.16, 1, 0.3, 1); font-size: 24px; }
+  .upload-btn:hover .upload-btn-icon { transform: scale(1.2) rotate(-10deg); }
+  .upload-btn.gallery .upload-btn-icon { background: linear-gradient(135deg, var(--btn), #a16207); box-shadow: 0 6px 15px rgba(212,175,55,0.4); }
+  .upload-btn.camera .upload-btn-icon { background: linear-gradient(135deg, var(--accent), #e11d48); box-shadow: 0 6px 15px var(--accent-glow); }
+  .upload-btn-label { font-size: 14px; font-weight: 900; color: var(--text); }
+
+  /* --- شاشة التحميل (رادار) --- */
+  .loading-overlay { position: absolute; inset: 0; background: rgba(0,0,0,0.7); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); display: none; align-items: center; justify-content: center; flex-direction: column; color: white; z-index: 999; border-radius: 24px; animation: fadeIn 0.3s ease; }
+  @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+  .radar-spinner { width: 70px; height: 70px; border-radius: 50%; border: 2px solid rgba(212,175,55,0.2); position: relative; overflow: hidden; margin-bottom: 20px; box-shadow: 0 0 30px rgba(212,175,55,0.3); }
+  .radar-spinner::after { content: ''; position: absolute; top: 50%; left: 50%; width: 6px; height: 6px; background: var(--btn); border-radius: 50%; transform: translate(-50%, -50%); box-shadow: 0 0 15px var(--btn); }
+  .radar-spinner::before { content: ''; position: absolute; top: 50%; left: 50%; width: 50%; height: 50%; background: conic-gradient(from 0deg, transparent 70%, var(--btn) 100%); transform-origin: 0 0; animation: radarScan 1.2s linear infinite; }
+  @keyframes radarScan { to { transform: rotate(360deg); } }
+
+  /* --- حقول الإدخال المحسنة --- */
+  .inputs-container { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 25px; }
+  .input-wrapper { background: var(--input); border: 2px solid transparent; border-radius: 18px; padding: 10px 15px; transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1); box-shadow: inset 0 2px 5px var(--shadow); }
+  .input-wrapper:focus-within { background: var(--input-focus); border-color: var(--btn); box-shadow: 0 10px 25px var(--primary-glow), inset 0 0 0 transparent; transform: translateY(-4px) scale(1.02); }
+  label { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; font-weight: 900; font-size: 15px; color: var(--text); }
+  .game-icon { width: 38px; height: 38px; filter: drop-shadow(0 4px 6px rgba(0,0,0,0.2)); transition: all 0.5s cubic-bezier(0.16, 1, 0.3, 1); }
+  .input-wrapper:hover .game-icon { transform: translateY(-3px) scale(1.1); filter: drop-shadow(0 8px 12px rgba(0,0,0,0.3)); }
+  .input-wrapper:focus-within .game-icon { transform: scale(1.2) rotate(10deg); filter: drop-shadow(0 0 12px var(--btn)); }
+  input[type="text"] { width: 100%; padding: 10px 0; border: none; background: transparent; font-size: 20px; font-weight: 900; color: var(--text); text-align: center; letter-spacing: 1px; outline: none; transition: color 0.3s; }
+  input[type="text"]:focus { color: var(--btn); }
+
+  /* --- الأزرار مع تأثيرات النبض --- */
+  .actions { display: flex; flex-wrap: wrap; gap: 12px; }
+  button { font-family: inherit; font-weight: 800; display: flex; align-items: center; justify-content: center; gap: 8px; border-radius: 16px; cursor: pointer; transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1); }
+  button.primary { flex: 1 1 100%; padding: 18px; border: none; background: linear-gradient(135deg, var(--btn), var(--btn-hover)); color: var(--btnText); font-size: 18px; box-shadow: 0 6px 20px var(--primary-glow); position: relative; overflow: hidden; }
+  button.primary::after { content: ''; position: absolute; top: -50%; left: -50%; width: 200%; height: 200%; background: radial-gradient(circle, rgba(255,255,255,0.3) 0%, transparent 60%); opacity: 0; transform: scale(0.5); transition: opacity 0.4s, transform 0.4s; pointer-events: none; }
+  button.primary:hover { transform: translateY(-4px) scale(1.01); box-shadow: 0 12px 30px var(--primary-glow); }
+  button.primary:hover::after { opacity: 1; transform: scale(1); }
+  button.primary:active { transform: scale(0.98); }
+  
+  button.primary.smart { flex: 1 1 45%; padding: 16px; background: linear-gradient(135deg, #8b0000, #b91c1c); box-shadow: 0 6px 20px var(--accent-glow); font-size: 16px; color: white; animation: subtlePulse 3s infinite alternate; }
+  @keyframes subtlePulse { 0% { box-shadow: 0 4px 15px var(--accent-glow); } 100% { box-shadow: 0 4px 30px rgba(185,28,28,0.6); } }
+  button.primary.smart:hover { background: linear-gradient(135deg, #7f1d1d, #991b1b); animation: none; transform: translateY(-4px); }
+  
+  button.secondary { flex: 1 1 20%; padding: 14px; border: 1.5px solid var(--border); background: var(--input); color: var(--text); font-size: 15px; }
+  button.secondary:hover { background: var(--card); border-color: var(--btn); transform: translateY(-3px); box-shadow: 0 8px 20px var(--shadow); }
+
+  /* --- البطاقات الناتجة المبهرة الانفجارية (Pop In) --- */
+  .out { display:none; background: var(--out); border: 1px solid var(--border); border-radius: 20px; padding: 20px; margin-top: 20px; font-weight: 700; line-height: 1.6; font-size: 16px; box-shadow: inset 0 2px 10px var(--shadow); backdrop-filter: blur(10px); }
+  @keyframes popIn { 0% { opacity: 0; transform: scale(0.9) translateY(20px); filter: blur(5px); } 100% { opacity: 1; transform: scale(1) translateY(0); filter: blur(0); } }
+  .out.show { display: block; animation: popIn 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+  .out.error { background: var(--error-bg); border-color: var(--error-border); color: var(--error-text); }
+  
+  .result-card { background: var(--card); border: 2px solid var(--btn); border-radius: 16px; padding: 15px; margin-top: 15px; text-align: center; box-shadow: 0 10px 30px var(--primary-glow); position: relative; overflow: hidden; transition: transform 0.3s; }
+  .result-card:hover { transform: scale(1.02); }
+  .result-card::before { content:''; position:absolute; top:0; left:-50%; width:200%; height:100%; background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent); transform: skewX(-20deg); animation: badgeShine 4s infinite; pointer-events: none;}
+  .result-types { display: flex; justify-content: center; align-items: center; gap: 15px; font-size: 22px; font-weight: 900; margin-top: 10px; }
+  .result-type { display: flex; align-items: center; gap: 8px; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.1)); }
+  .result-plus { color: var(--muted); font-size: 18px; }
+  .result-text { font-size: 14px; color: var(--muted); margin-top: 15px; border-top: 1px solid var(--border); padding-top: 10px;}
+
+  /* --- التوكات والاشعارات --- */
+  .pill { display: inline-flex; align-items: center; padding: 4px 14px; border: 1px solid var(--border); border-radius: 999px; font-size: 14px; font-weight: 900; background: var(--card); box-shadow: 0 4px 10px var(--shadow); color: var(--btn); transition: transform 0.3s; }
+  .pill:hover { transform: translateY(-2px); }
+  
+  .toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%) translateY(30px) scale(0.9); background: var(--btn); color: var(--btnText); padding: 14px 28px; border-radius: 999px; box-shadow: 0 15px 40px var(--primary-glow); opacity: 0; pointer-events: none; transition: all 0.5s cubic-bezier(0.16, 1, 0.3, 1); z-index: 9999; font-size: 16px; font-weight: 900; display: flex; align-items: center; gap: 8px;}
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
+
+  /* --- المخطط والتحليل الذكي --- */
+  .chartWrap { margin-top: 25px; display: flex; gap: 20px; align-items: stretch; justify-content: center; flex-wrap: wrap; animation: popIn 0.7s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+  .chartCard { flex: 0 0 auto; width: 220px; height: 220px; border-radius: 50%; border: 4px solid var(--card); background: var(--input); display: flex; align-items: center; justify-content: center; position: relative; box-shadow: 0 15px 35px var(--shadow), inset 0 4px 15px var(--shadow); transition: transform 0.5s; }
+  .chartCard:hover { transform: rotate(5deg) scale(1.05); }
+  canvas#chart { width: 200px; height: 200px; filter: drop-shadow(0 6px 12px rgba(0,0,0,0.2)); z-index: 2;}
+  .chartCenter { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 3; }
+  .chartCenter .ratio { font-size: 34px; font-weight: 900; color: var(--text); text-shadow: 0 2px 8px var(--card); }
+  
+  .smartBox { margin-top: 20px; padding: 24px; border-radius: 20px; background: linear-gradient(145deg, rgba(139, 0, 0, 0.08), rgba(212, 175, 55, 0.08)); border: 1px solid var(--border); box-shadow: inset 0 0 30px var(--shadow); display: none;}
+  .smartBox h3 { color: var(--accent); margin: 0 0 10px 0; display: flex; align-items: center; gap: 8px;}
+  .smartBox.show { display: block; animation: popIn 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+
+  /* تنسيق الإعدادات */
+  .langBtns { display: flex; flex-direction: column; gap: 12px; }
+  .langBtn { padding: 16px; border-radius: 16px; background: var(--input); border: 1px solid var(--border); font-size: 16px; font-weight: bold; cursor: pointer; color: var(--text); transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1); box-shadow: 0 4px 10px var(--shadow); }
+  .langBtn:hover { background: var(--card); border-color: var(--btn); transform: translateY(-2px); }
+  .langBtn.active { background: linear-gradient(135deg, var(--btn), var(--btn-hover)); color: white; border-color: transparent; box-shadow: 0 8px 25px var(--primary-glow); transform: scale(1.02); }
+  .signature { margin-top: 24px; text-align: center; font-size: 15px; padding: 16px; border-radius: 16px; background: var(--card); color: var(--muted); border: 1px solid var(--border); font-weight: 700; backdrop-filter: blur(10px); }
+  .signature span { color: var(--btn); font-weight: 900; letter-spacing: 1px; }
+
+</style>
+</head>
+
+<body>
+
+<!-- موجة الخلفية (SVG) -->
+<svg class="bg-wave" viewBox="0 0 1440 320" preserveAspectRatio="none">
+  <path fill="var(--accent)" fill-opacity="0.05" d="M0,160L48,144C96,128,192,96,288,106.7C384,117,480,171,576,181.3C672,192,768,149,864,128C960,107,1056,107,1152,128C1248,149,1344,192,1392,213.3L1440,234.7L1440,0L1392,0C1344,0,1248,0,1152,0C1056,0,960,0,864,0C768,0,672,0,576,0C480,0,384,0,288,0C192,0,96,0,48,0L0,0Z"></path>
+</svg>
+
+<div class="container">
+
+  <!-- الهيدر والتبويبات المدمجة -->
+  <div class="topbar">
+    <div class="tabs-nav">
+      <button class="tab-btn active" onclick="switchTab('tab-analysis')">⚔️ تحليل</button>
+      <button class="tab-btn" onclick="switchTab('tab-settings')">⚙️ إعدادات</button>
+    </div>
+    <div class="header-actions">
+      <button class="icon-btn" onclick="toggleDark()" title="تغيير المظهر">🌙</button>
+    </div>
+  </div>
+
+  <!-- تبويب الإعدادات (مخفي افتراضياً) -->
+  <div id="tab-settings" class="tab-content">
+    <div class="box">
+      <h3 style="margin-top:0; color:var(--btn)">اللغة / Language</h3>
+      <div class="langBtns">
+        <button class="langBtn" id="btn-ar" onclick="setLang('ar')">🇸🇦 العربية</button>
+        <button class="langBtn" id="btn-en" onclick="setLang('en')">🇺🇸 English</button>
+        <button class="langBtn" id="btn-pt" onclick="setLang('pt')">🇧🇷 Português</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- التبويب الرئيسي: التحليل -->
+  <div id="tab-analysis" class="tab-content active">
+    
+    <div class="hero-container stagger-1">
+      <!-- جزيئات متطايرة -->
+      <div class="particles">
+        <div class="particle"></div><div class="particle"></div><div class="particle"></div>
+      </div>
+      <img src="camp.png" alt="Daly Camp" class="hero-image" onerror="this.style.display='none'">
+    </div>
+
+    <h2 id="title" class="stagger-1">
+      <span class="daly-text">Daly</span><span class="alpha-badge">ALPHA</span>
+    </h2>
+
+    <div class="muted stagger-1" id="hint">اكتب مثل: <span class="pill">360k</span> أو <span class="pill">1.1m</span></div>
+
+    <div class="box stagger-2">
+      
+      <div class="loading-overlay" id="loadingOverlay">
+        <div class="radar-spinner"></div>
+        <div id="loadingText" style="font-size: 18px; letter-spacing:1px; margin-top:10px;">مسح استطلاعي...</div>
+      </div>
+
+      <!-- منطقة الرفع -->
+      <div class="upload-section" id="uploadArea">
+        <div class="upload-btns">
+          <div class="upload-btn gallery">
+            <input type="file" id="imageInput" accept="image/*" onchange="handleImageUpload(event)">
+            <div class="upload-btn-icon">📁</div>
+            <div class="upload-btn-label" id="uploadLblGallery">مكتبة الصور</div>
+          </div>
+          <div class="upload-btn camera">
+            <input type="file" accept="image/*" capture="environment" onchange="handleImageUpload(event)">
+            <div class="upload-btn-icon">📸</div>
+            <div class="upload-btn-label" id="uploadLblCamera">التقاط صورة</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- حقول الإدخال -->
+      <div class="inputs-container">
+        <div class="input-wrapper">
+          <label id="lblSni"><img src="sniper.png" class="game-icon"> <span>قناص دالي</span></label>
+          <input id="enSni" type="text" placeholder="0" />
+        </div>
+        <div class="input-wrapper">
+          <label id="lblInf"><img src="fighter.png" class="game-icon"> <span>مقاتل دالي</span></label>
+          <input id="enInf" type="text" placeholder="0" />
+        </div>
+        <div class="input-wrapper">
+          <label id="lblCav"><img src="cavalry.png" class="game-icon"> <span>جوال دالي</span></label>
+          <input id="enCav" type="text" placeholder="0" />
+        </div>
+      </div>
+
+      <!-- الأزرار -->
+      <div class="actions stagger-3">
+        <button class="primary" onclick="calc()" id="calcBtn">⚔️ احسب التشكيلة المثالية</button>
+        <button class="primary smart" onclick="smartAnalyze()" id="smartBtn">🧠 تحليل ذكي عميق</button>
+        <button class="secondary" onclick="copyResult()" id="copyBtn">📋 نسخ</button>
+        <button class="secondary" onclick="shareResult()" id="shareBtn">🔗 مشاركة</button>
+        <button class="secondary" onclick="resetAll()" id="resetBtn">♻️ تفريغ</button>
+      </div>
+
+      <!-- النتائج -->
+      <div id="out" class="out"></div>
+      <div id="smartBox" class="smartBox"></div>
+      
+      <!-- الرسم البياني -->
+      <div class="chartWrap" id="chartWrap" style="display:none">
+        <div class="chartCard">
+          <canvas id="chart" width="200" height="200"></canvas>
+          <div class="chartCenter">
+            <div class="ratio" id="ratioText">70/30</div>
+          </div>
+        </div>
+        <div class="legend" style="flex:1; min-width:200px; background:var(--input); border:1px solid var(--border); border-radius:20px; padding:20px;">
+          <h3 id="legendTitle" style="color:var(--muted); margin-top:0;">التوصية النهائية</h3>
+          <div class="row" style="background:var(--card); margin-bottom:10px; border-radius:15px;">
+            <div class="left"><span class="dot" id="dotA"></span><img id="iconA" class="game-icon" style="width:24px;height:24px"><span id="nameA">قناص</span></div>
+            <div class="pct" id="pctA">70%</div>
+          </div>
+          <div class="row" style="background:var(--card); border-radius:15px;">
+            <div class="left"><span class="dot" id="dotB"></span><img id="iconB" class="game-icon" style="width:24px;height:24px"><span id="nameB">مقاتل</span></div>
+            <div class="pct" id="pctB">30%</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <div class="signature stagger-3" id="sig">تم برمجة <span>Daly Alpha</span> بواسطة F11</div>
+  </div>
+</div>
+
+<div class="toast" id="toast">✅</div>
+
+<script>
+/* ================== نظام التبويبات ================== */
+function switchTab(tabId) {
+  document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById(tabId).classList.add('active');
+  event.currentTarget.classList.add('active');
+}
+
+/* ================== دوال أساسية ================== */
+function safeSetStorage(k, v) { try { localStorage.setItem(k, v); } catch(e){} }
+function safeGetStorage(k) { try { return localStorage.getItem(k); } catch(e){ return null; } }
+
+function showSiteError(msg) {
+    const outEl = document.getElementById("out");
+    outEl.innerHTML = `<b style="color:var(--error-text)">❌ ${msg}</b>`;
+    outEl.className = "out show error";
+    toast("❌ خطأ");
+    hideChart();
+    document.getElementById("smartBox").classList.remove("show");
+}
+
+function parseNum(v) {
+  v = (v||"").toString().toLowerCase().trim().replace(/,/g,"");
+  if(v.endsWith("k")) return (parseFloat(v)||0) * 1000;
+  if(v.endsWith("m")) return (parseFloat(v)||0) * 1000000;
+  return parseFloat(v)||0;
+}
+function pct(x) { return Math.round(x*100); }
+const TYPE_ICON = { sni:"sniper.png", inf:"fighter.png", cav:"cavalry.png" };
+const TYPE_COLOR = { sni:"#2563eb", inf:"#d97706", cav:"#9333ea" }; 
+
+/* ================== الحسابات وتحديث الواجهة ================== */
+const counterOf = { sni:"cav", inf:"sni", cav:"inf" };
+const beatenBy  = { cav:"inf", sni:"cav", inf:"sni" };
+
+function typeText(type) { const t=T[LANG]; return type==="sni"?t.sni : type==="inf"?t.inf : t.cav; }
+
+function calc() {
+  const en = { sni: parseNum(document.getElementById("enSni").value), inf: parseNum(document.getElementById("enInf").value), cav: parseNum(document.getElementById("enCav").value) };
+  const total = en.sni + en.inf + en.cav;
+  const t = T[LANG] || T.ar;
+  
+  document.getElementById("smartBox").classList.remove("show");
+  if(total <= 0) { showSiteError(t.err); return; }
+
+  let major = "sni"; 
+  if(en.inf > en[major]) major = "inf"; 
+  if(en.cav > en[major]) major = "cav";
+  
+  const A = counterOf[major], danger = beatenBy[A], B = counterOf[danger];
+  const dangerRatio = en[danger] / total;
+  
+  let aShare = (dangerRatio < 0.18)? 0.8 : (dangerRatio < 0.3)? 0.7 : (dangerRatio < 0.45)? 0.65 : 0.6;
+  if(B === A) aShare = 1.0;
+  const bShare = Math.max(0, 1 - aShare);
+
+  LAST_COPY_TEXT = `${typeText(A)} ${pct(aShare)}% + ${typeText(B)} ${pct(bShare)}%`;
+  
+  const htmlOut = `
+    <div style="font-size:14px; color:var(--muted); text-align:center;">${t.headerEnemy} ${en.inf/1000}k مقاتل · ${en.sni/1000}k قناص · ${en.cav/1000}k جوال</div>
+    <div class="result-card">
+      <div style="color:var(--btn); font-weight:800; font-size:14px; margin-bottom:5px;">${t.bestLine}</div>
+      <div class="result-types">
+        <div class="result-type" style="color:${TYPE_COLOR[A]}"><img src="${TYPE_ICON[A]}" style="width:30px"> ${typeText(A)} ${pct(aShare)}%</div>
+        ${bShare > 0 ? `<div class="result-plus">+</div><div class="result-type" style="color:${TYPE_COLOR[B]}"><img src="${TYPE_ICON[B]}" style="width:30px"> ${typeText(B)} ${pct(bShare)}%</div>` : ''}
+      </div>
+      <div class="result-text">${t.reason2} <b>${typeText(major)}</b> ${t.reason3} <b>${typeText(A)}</b>.</div>
+    </div>
+  `;
+  
+  const outEl = document.getElementById("out");
+  outEl.className = "out show";
+  outEl.innerHTML = htmlOut;
+  showChart(A, B, aShare, bShare);
+}
+
+function smartAnalyze() {
+  const sni = parseNum(document.getElementById("enSni").value), inf = parseNum(document.getElementById("enInf").value), cav = parseNum(document.getElementById("enCav").value);
+  const box = document.getElementById("smartBox");
+  const t = T[LANG] || T.ar; 
+  const total = sni + inf + cav;
+  if(!total) { box.classList.remove("show"); showSiteError(t.err); return; }
+
+  const e =[sni/total, inf/total, cav/total], counter =[2,0,1], losesTo =[2,0,1];      
+  let E1 = 0; for(let i=1; i<3; i++) if(e[i] > e[E1]) E1 = i;
+  const P = counter[E1], V = losesTo[P], S = counter[V];             
+  
+  let pPct = 70 + (e[E1] - 0.50)*30 - e[V]*40;
+  pPct = Math.round(Math.max(55, Math.min(85, pPct))/5)*5; 
+  const sPct = 100 - pPct;
+
+  box.innerHTML = `
+    <h3>🧠 ${t.smartTitle}</h3><div class="muted" style="margin-bottom:15px">${t.smartSub}</div>
+    <div class="result-card" style="border-color:var(--accent); margin-bottom:15px;">
+      <div style="color:var(--accent); font-weight:800; font-size:14px;">${t.smartRec}</div>
+      <div class="result-types">
+        <div class="result-type"><img src="${TYPE_ICON[P===0?'sni':P===1?'inf':'cav']}" style="width:26px"> ${pPct}%</div>
+        <div class="result-plus">+</div>
+        <div class="result-type"><img src="${TYPE_ICON[S===0?'sni':S===1?'inf':'cav']}" style="width:26px"> ${sPct}%</div>
+      </div>
+    </div>
+    <ul style="font-size:14px; padding-inline-start:20px; margin:0; line-height:1.7;">
+      <li><b>${t.smartWhy1}</b> النسبة الأكبر.</li>
+      <li>${e[V]>0.15 ? `تمت إضافة النوع الثاني لتغطية نقطة الضعف.` : `لا توجد تهديدات ثانوية كبيرة.`}</li>
+    </ul>
+  `;
+  
+  document.getElementById("out").className="out"; 
+  box.classList.add("show");
+  
+  const tKeys =["sni","inf","cav"];
+  LAST_COPY_TEXT = `التوصية الذكية: ${typeText(tKeys[P])} ${pPct}% + ${typeText(tKeys[S])} ${sPct}%`;
+  showChart(tKeys[P], tKeys[S], pPct/100, sPct/100);
+}
+
+/* ================== OCR الذكي السريع ================== */
+async function handleImageUpload(event) {
+    const file = event.target.files[0]; if (!file) return;
+    document.getElementById("out").className = "out";
+
+    if (typeof Tesseract === 'undefined') {
+        showSiteError("مكتبة الذكاء الاصطناعي لم يتم تحميلها بعد.");
+        document.getElementById("imageInput").value = ""; return;
+    }
+
+    const overlay = document.getElementById("loadingOverlay");
+    overlay.style.display = "flex";
+    await new Promise(r => setTimeout(r, 50)); 
+
+    try {
+        const img = new Image(); img.src = URL.createObjectURL(file);
+        await new Promise((res, rej) => { img.onload = res; img.onerror = rej; });
+
+        const canvas = document.createElement('canvas'); const ctx = canvas.getContext('2d');
+        const startY = img.height * 0.20, sliceHeight = img.height * 0.60; 
+        
+        let scale = img.width < 600 ? 2 : (img.width > 1200 ? 1200/img.width : 1);
+        canvas.width = img.width * scale; canvas.height = sliceHeight * scale;
+        
+        ctx.imageSmoothingEnabled = true; ctx.drawImage(img, 0, startY, img.width, sliceHeight, 0, 0, canvas.width, canvas.height);
+        
+        const imgData = ctx.getImageData(0,0, canvas.width, canvas.height), d = imgData.data;
+        for (let i=0; i<d.length; i+=4) {
+            let g = (d[i]*0.299 + d[i+1]*0.587 + d[i+2]*0.114 - 128)*1.6 + 128;
+            d[i] = d[i+1] = d[i+2] = g>255?255 : g<0?0 : g;
+        }
+        ctx.putImageData(imgData, 0, 0);
+
+        const worker = await Tesseract.createWorker('eng');
+        await worker.setParameters({ tessedit_char_whitelist: '0123456789.,kmKM ' });
+        const ret = await worker.recognize(canvas.toDataURL('image/png'));
+        await worker.terminate();
+
+        const numRegex = /^(\d+[\.,]?\d*[km]?)$/i;
+        let words =[];
+        for (let w of ret.data.words) {
+            let t = w.text.toLowerCase().replace(/,/g,'.').replace(/[oO]/g,'0').replace(/[lL|]/g,'1').replace(/[^0-9\.km]/g,'');
+            if (t && numRegex.test(t) && t !== ".") words.push({ text:t, y:w.bbox.y0, x:w.bbox.x0 });
+        }
+        words.sort((a,b) => a.y - b.y);
+
+        let rows =[];
+        if (words.length > 0) {
+            let curr = [words[0]], thr = Math.max(25, canvas.height*0.04);
+            for(let i=1; i<words.length; i++) {
+                if(Math.abs(words[i].y - curr[0].y) < thr) curr.push(words[i]);
+                else { rows.push(curr); curr = [words[i]]; }
+            }
+            rows.push(curr);
+        }
+
+        let target = rows.find(r => r.length >= 3 && (r.some(n => /[km]/i.test(n.text)) || r.every(n => n.text === "0")));
+        
+        if (target) {
+            target.sort((a,b) => a.x - b.x);
+            document.getElementById("enInf").value = target[0].text;
+            document.getElementById("enSni").value = target[1].text;
+            document.getElementById("enCav").value = target[2].text;
+            toast("✅ اكتمل الفحص!"); setTimeout(() => calc(), 400);
+        } else {
+            showSiteError("لم يتم العثور على أرقام التشكيلة، يرجى التأكد من الصورة.");
+        }
+    } catch(e) { showSiteError("حدث خطأ تقني في مسح الصورة."); } 
+    finally { overlay.style.display = "none"; document.querySelectorAll('input[type="file"]').forEach(i=>i.value=""); }
+}
+
+/* ================== المخطط والأدوات ================== */
+function hideChart() { document.getElementById("chartWrap").style.display = "none"; LAST_REC = null; }
+function showChart(A, B, aShare, bShare) {
+  LAST_REC = {A,B,aShare,bShare}; 
+  document.getElementById("ratioText").innerText = `${pct(aShare)}/${pct(bShare)}`; 
+  document.getElementById("nameA").innerText = typeText(A); document.getElementById("nameB").innerText = typeText(B); 
+  document.getElementById("iconA").src = TYPE_ICON[A]; document.getElementById("iconB").src = TYPE_ICON[B]; 
+  document.getElementById("pctA").innerText = `${pct(aShare)}%`; document.getElementById("pctB").innerText = `${pct(bShare)}%`; 
+  document.getElementById("dotA").style.background = TYPE_COLOR[A]; document.getElementById("dotB").style.background = TYPE_COLOR[B]; 
+  drawRealisticDonut(A, B, aShare); document.getElementById("chartWrap").style.display = "flex";
+}
+function drawRealisticDonut(tA, tB, aShare) {
+  const c=document.getElementById("chart"), ctx=c.getContext("2d");
+  const W=c.width, H=c.height, cx=W/2, cy=H/2, r=W/2-15, th=16;
+  ctx.clearRect(0,0,W,H); ctx.lineWidth=th; ctx.lineCap="round";
+  
+  ctx.beginPath(); ctx.arc(cx,cy,r,0,Math.PI*2); ctx.strokeStyle=document.body.classList.contains("dark")?"#1e293b":"#e2e8f0"; ctx.stroke();
+  
+  const start = -Math.PI/2, endA = start + Math.PI*2*aShare;
+  if(aShare<1) { ctx.beginPath(); ctx.arc(cx,cy,r,endA, endA+Math.PI*2*(1-aShare)); ctx.strokeStyle=TYPE_COLOR[tB]; ctx.stroke(); }
+  ctx.beginPath(); ctx.arc(cx,cy,r,start,endA); ctx.strokeStyle=TYPE_COLOR[tA]; ctx.stroke();
+}
+
+function toast(m) { const e=document.getElementById("toast"); e.innerHTML=m; e.classList.add("show"); setTimeout(()=>e.classList.remove("show"), 2500); }
+async function copyResult() { try { await navigator.clipboard.writeText(LAST_COPY_TEXT||""); toast("✅ تم النسخ"); }catch(e){} }
+async function shareResult() { try{ await navigator.share({title:"Daly Alpha",text:LAST_COPY_TEXT}); }catch(e){ copyResult(); } }
+function resetAll() {["enSni","enInf","enCav"].forEach(i=>document.getElementById(i).value=""); document.getElementById("out").className="out"; hideChart(); document.getElementById("smartBox").classList.remove("show"); toast("♻️ تم التفريغ"); }
+
+/* ================== اللغات ================== */
+const T = {
+  ar: { sni:"قناص", inf:"مقاتل", cav:"جوال", headerEnemy:"قوات دالي:", bestLine:"الهجوم المثالي:", reason2:"دالي يركز على", reason3:"مضاده هو", smartTitle:"تحليل ألفا", smartSub:"تحليل رياضي متقدم", smartRec:"تشكيلة ألفا", smartWhy1:"النوع الأساسي يسحق نقطة قوتهم", err:"أدخل الأرقام أولاً.", uploadLblGallery:"مكتبة الصور", uploadLblCamera:"التقاط صورة" },
+  en: { sni:"Sniper", inf:"Fighter", cav:"Cavalry", headerEnemy:"Daly:", bestLine:"Ideal Attack:", reason2:"Focuses on", reason3:"counter is", smartTitle:"Alpha Analysis", smartSub:"Advanced Math", smartRec:"Alpha Setup", smartWhy1:"Main type counters strength", err:"Enter numbers.", uploadLblGallery:"Gallery", uploadLblCamera:"Camera" },
+  pt: { sni:"Atirador", inf:"Lutador", cav:"Cavalaria", headerEnemy:"Daly:", bestLine:"Ataque Ideal:", reason2:"Foca em", reason3:"counter é", smartTitle:"Análise Alpha", smartSub:"Matemática", smartRec:"Setup Alpha", smartWhy1:"Tipo principal anula força", err:"Insira números.", uploadLblGallery:"Galeria", uploadLblCamera:"Câmera" }
+};
+let LANG="ar";
+function setLang(l) { LANG=l||"ar"; safeSetStorage("F11_LANG", LANG); document.documentElement.dir=LANG==="ar"?"rtl":"ltr"; document.querySelectorAll('.langBtn').forEach(b=>b.classList.toggle('active',b.id===`btn-${LANG}`)); 
+  document.getElementById("uploadLblGallery").innerText = T[LANG].uploadLblGallery;
+  document.getElementById("uploadLblCamera").innerText = T[LANG].uploadLblCamera;
+}
+function toggleDark() { document.body.classList.toggle("dark"); safeSetStorage("F11_DARK", document.body.classList.contains("dark")?"1":"0"); if(LAST_REC) drawRealisticDonut(LAST_REC.A,LAST_REC.B,LAST_REC.aShare); }
+
+document.addEventListener("DOMContentLoaded", ()=>{
+  setLang(safeGetStorage("F11_LANG") || (navigator.language.startsWith("en")?"en":"ar"));
+  if(safeGetStorage("F11_DARK")==="1") document.body.classList.add("dark");
+  
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(()=>{});
+});
+</script>
+</body>
+</html>

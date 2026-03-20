@@ -1,0 +1,974 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Daly Alpha</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0b0f19">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Daly Alpha">
+<link rel="apple-touch-icon" href="camp.png">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800;900&display=swap" rel="stylesheet">
+
+<script src="https://unpkg.com/tesseract.js@5/dist/tesseract.min.js"></script>
+
+<style>
+  /* ================== الألوان المريحة والفخمة ================== */
+  :root {
+    --bg-grad-1: #f1f5f9;
+    --bg-grad-2: #e2e8f0;
+    --card: rgba(255, 255, 255, 0.7);
+    --border: rgba(255, 255, 255, 0.4);
+    --text: #0f172a;
+    --muted: #64748b;
+    --btn: #d4af37; /* ذهبي أنيق */
+    --btn-hover: #b8860b;
+    --accent: #991b1b; /* أحمر داكن */
+    --accent-hover: #7f1d1d;
+    --btnText: #ffffff;
+    --input: rgba(255, 255, 255, 0.5);
+    --input-focus: rgba(255, 255, 255, 0.9);
+    --shadow: rgba(0, 0, 0, 0.05);
+    --shadow-hover: rgba(0, 0, 0, 0.1);
+    --blur: blur(20px);
+  }
+
+  body.dark {
+    --bg-grad-1: #0b0f19; /* كحلي عميق جداً يطابق صورتك */
+    --bg-grad-2: #111827; 
+    --card: rgba(30, 41, 59, 0.4); /* زجاج شفاف داكن */
+    --border: rgba(255, 255, 255, 0.06);
+    --text: #f8fafc;
+    --muted: #94a3b8;
+    --btn: #eab308; /* أصفر/ذهبي فاقع */
+    --btn-hover: #ca8a04;
+    --accent: #b91c1c; /* أحمر راقي */
+    --accent-hover: #991b1b;
+    --btnText: #0f172a;
+    --input: rgba(15, 23, 42, 0.6);
+    --input-focus: rgba(30, 41, 59, 0.9);
+    --shadow: rgba(0, 0, 0, 0.4);
+    --shadow-hover: rgba(0, 0, 0, 0.6);
+  }
+
+  /* ================== الخلفية المتحركة ببطء ================== */
+  body { 
+    font-family: 'Tajawal', sans-serif; 
+    margin: 0; padding: 0; 
+    color: var(--text); 
+    background: linear-gradient(135deg, var(--bg-grad-1), var(--bg-grad-2));
+    background-size: 200% 200%;
+    animation: gradientBG 15s ease infinite;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+  @keyframes gradientBG { 0% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } 100% { background-position: 0% 50%; } }
+
+  .main-container { max-width: 760px; margin: auto; padding: 0 16px 30px; position: relative; z-index: 2;}
+
+  /* ================== الزجاج الأنيق (Glassmorphism) ================== */
+  .glass {
+    background: var(--card);
+    backdrop-filter: var(--blur);
+    -webkit-backdrop-filter: var(--blur);
+    border: 1px solid var(--border);
+    border-radius: 24px;
+    box-shadow: 0 8px 30px var(--shadow);
+  }
+
+  /* ================== الموجة والجزيئات الناعمة ================== */
+  .wave-container { position: fixed; top: 0; left: 0; width: 100%; height: 40vh; z-index: -2; opacity: 0.2; pointer-events: none; }
+  .wave-container svg { width: 100%; height: 100%; fill: var(--btn); }
+  .particles-container { position: fixed; inset: 0; pointer-events: none; z-index: -1; overflow: hidden; opacity: 0.5;}
+  .particle { position: absolute; border-radius: 50%; background: var(--btn); box-shadow: 0 0 8px var(--btn); opacity: 0; animation: floatUp linear infinite; }
+  @keyframes floatUp { 0% { transform: translateY(100vh) scale(0.5); opacity: 0; } 50% { opacity: 0.6; } 100% { transform: translateY(-10vh) scale(1.2); opacity: 0; } }
+
+  /* ================== الهيدر والتبويبات ================== */
+  .sticky-header { position: sticky; top: 0; z-index: 100; padding: 16px 16px 0; margin-bottom: 24px; background: var(--card); backdrop-filter: var(--blur); -webkit-backdrop-filter: var(--blur); border-bottom: 1px solid var(--border); box-shadow: 0 4px 20px var(--shadow); }
+  .topbar { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 16px; max-width: 760px; margin-left: auto; margin-right: auto; }
+  .langBtns { display: flex; gap: 6px; background: var(--input); padding: 6px; border-radius: 16px; border: 1px solid var(--border); }
+  .langBtn { padding: 8px 14px; border: none; border-radius: 10px; background: transparent; cursor: pointer; font-size: 14px; font-weight: 700; font-family: inherit; color: var(--muted); transition: all 0.3s ease; }
+  .langBtn:hover { color: var(--text); }
+  .langBtn.active { background: var(--btn); color: var(--btnText); box-shadow: 0 4px 12px rgba(234, 179, 8, 0.3); }
+  
+  .toggleBtn { padding: 10px 18px; border: 1px solid var(--border); border-radius: 14px; background: var(--input); cursor: pointer; font-size: 14px; font-weight: 700; font-family: inherit; color: var(--text); transition: all 0.3s ease; }
+  .toggleBtn:hover { border-color: var(--btn); }
+  
+  .tabs { display: flex; justify-content: center; gap: 10px; max-width: 760px; margin: auto; padding-bottom: 10px; }
+  .tab-btn { flex: 1; padding: 12px; font-size: 15px; font-weight: 800; color: var(--muted); background: transparent; border: none; border-bottom: 3px solid transparent; cursor: pointer; transition: all 0.3s; font-family: inherit;}
+  .tab-btn:hover { color: var(--text); }
+  .tab-btn.active { color: var(--btn); border-bottom: 3px solid var(--btn); }
+  .tab-content { display: none; }
+  .tab-content.active { display: block; animation: slideInUp 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;}
+
+  @media (max-width: 720px) { .topbar { flex-direction: column; align-items: stretch; } .langBtns { justify-content: center; } .toggleBtn { width: 100%;} }
+
+  /* ================== الأنيميشن للدخول ================== */
+  .slide-up { opacity: 0; animation: slideInUp 0.6s cubic-bezier(0.2, 0.8, 0.2, 1) forwards; }
+  .delay-1 { animation-delay: 0.1s; } .delay-2 { animation-delay: 0.2s; }
+  @keyframes slideInUp { from { opacity: 0; transform: translateY(30px); } to { opacity: 1; transform: translateY(0); } }
+
+  /* ================== الهيرو (صورة المعسكر) ================== */
+  .hero-container { text-align: center; margin: 10px auto 25px auto; display: flex; justify-content: center; align-items: center; position: relative; z-index: 2;}
+  .hero-container::before { content: ""; position: absolute; width: 180px; height: 180px; background: radial-gradient(circle, rgba(234,179,8,0.2) 0%, transparent 70%); border-radius: 50%; z-index: -1; animation: pulseGlow 4s infinite alternate ease-in-out; filter: blur(15px); pointer-events: none; }
+  .hero-image { max-width: 220px; height: auto; object-fit: contain; filter: drop-shadow(0 15px 25px rgba(0,0,0,0.4)); animation: floatCamp 5s ease-in-out infinite; }
+  @keyframes floatCamp { 0%, 100% { transform: translateY(0px); } 50% { transform: translateY(-10px); } }
+  @keyframes pulseGlow { from { transform: scale(0.9); opacity: 0.6; } to { transform: scale(1.2); opacity: 1; } }
+
+  h2#title { display: flex; align-items: center; justify-content: center; gap: 10px; margin: 0 0 15px; position: relative; z-index: 2; }
+  .daly-text { font-size: 36px; font-weight: 900; color: var(--text); letter-spacing: -0.5px; text-shadow: 0 4px 15px var(--shadow); }
+  .alpha-badge { font-size: 12px; font-weight: 900; text-transform: uppercase; letter-spacing: 2px; padding: 4px 10px; border-radius: 8px; background: var(--accent); color: #fff; }
+  
+  .muted-title { color: var(--muted); font-size: 15px; text-align: center; margin-bottom: 25px; font-weight: 700; display: flex; justify-content: center; align-items: center; gap: 8px;}
+  .pill { padding: 4px 12px; border: 1px solid var(--border); border-radius: 999px; font-size: 13px; font-weight: 800; color: var(--text); background: var(--input); }
+
+  /* ================== الصندوق الرئيسي ================== */
+  .box { padding: 24px; position: relative; z-index: 2; }
+
+  /* ================== منطقة الرفع (تصميم نظيف مقسم) ================== */
+  .upload-section { margin-bottom: 24px; position: relative; }
+  .upload-header { display: flex; align-items: center; justify-content: center; gap: 10px; font-size: 14px; font-weight: 800; color: var(--muted); margin-bottom: 16px; }
+  .upload-header::before, .upload-header::after { content: ''; height: 1px; width: 40px; background: var(--border); }
+  
+  .upload-btns { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; }
+  .upload-btn { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 24px 12px; border-radius: 20px; border: 1px solid var(--border); background: var(--input); cursor: pointer; transition: all 0.3s ease; position: relative; overflow: hidden; box-shadow: 0 4px 15px var(--shadow); }
+  .upload-btn input[type="file"] { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; z-index: 5; }
+  .upload-btn:hover { transform: translateY(-3px); border-color: var(--btn); background: var(--card); box-shadow: 0 8px 25px var(--shadow-hover); }
+  
+  .upload-icon-circle { width: 56px; height: 56px; border-radius: 18px; display: flex; align-items: center; justify-content: center; transition: transform 0.3s ease; }
+  .upload-btn:hover .upload-icon-circle { transform: scale(1.1); }
+  .upload-btn.gallery .upload-icon-circle { background: linear-gradient(135deg, var(--btn), var(--btn-hover)); box-shadow: 0 6px 15px rgba(234,179,8,0.3); }
+  .upload-btn.camera .upload-icon-circle { background: linear-gradient(135deg, var(--muted), #334155); box-shadow: 0 6px 15px rgba(0,0,0,0.3); }
+  
+  .upload-btn-label { font-size: 15px; font-weight: 800; color: var(--text); }
+  
+  /* معاينة الصورة */
+  .upload-preview { display: none; align-items: center; gap: 12px; margin-top: 16px; padding: 12px 16px; border-radius: 16px; background: var(--input); border: 1px solid var(--btn); }
+  .upload-preview.show { display: flex; animation: slideInUp 0.3s ease forwards; }
+  .upload-preview-thumb { width: 48px; height: 48px; border-radius: 12px; object-fit: cover; }
+  .upload-preview-info { flex: 1; min-width: 0; }
+  .upload-preview-name { font-size: 14px; font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--text);}
+  .upload-preview-close { background: rgba(0,0,0,0.1); border: none; width: 30px; height: 30px; border-radius: 50%; cursor: pointer; color: var(--text); font-weight: bold; transition: background 0.2s; }
+  .upload-preview-close:hover { background: var(--accent); color: white; }
+
+  /* ================== مؤشر التحميل النظيف ================== */
+  .loading-overlay { position: absolute; inset: 0; background: rgba(15,23,42,0.85); backdrop-filter: blur(8px); display: none; align-items: center; justify-content: center; flex-direction: column; color: white; z-index: 999; border-radius: 24px; }
+  .spinner { width: 50px; height: 50px; border: 4px solid rgba(255,255,255,0.1); border-top-color: var(--btn); border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 16px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ================== الحقول (تصميم أنيق ونظيف جداً) ================== */
+  .inputs-container { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 24px; position: relative; z-index: 3; }
+  
+  .input-wrapper { background: var(--input); border: 1px solid var(--border); border-radius: 20px; padding: 20px 16px; transition: all 0.3s ease; box-shadow: 0 4px 15px var(--shadow); }
+  .input-wrapper:focus-within { border-color: var(--btn); box-shadow: 0 8px 25px rgba(234,179,8,0.15); transform: translateY(-4px); background: var(--card); }
+  
+  label { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; font-weight: 800; font-size: 15px; color: var(--text); transition: color 0.3s;}
+  .game-icon { width: 40px; height: 40px; object-fit: contain; filter: drop-shadow(0 4px 6px rgba(0,0,0,0.2)); transition: transform 0.3s ease; }
+  .input-wrapper:focus-within .game-icon { transform: scale(1.1) rotate(-5deg); filter: drop-shadow(0 4px 10px var(--btn)); }
+  .input-wrapper:focus-within label { color: var(--btn); }
+
+  input[type="text"] { width: 100%; padding: 12px; border: none; border-radius: 12px; font-size: 22px; font-weight: 900; font-family: inherit; text-align: center; background: rgba(0,0,0,0.04); color: var(--text); transition: all 0.3s ease; }
+  .dark input[type="text"] { background: rgba(0,0,0,0.2); }
+  input[type="text"]::placeholder { font-size: 14px; font-weight: 700; opacity: 0.3; }
+  input[type="text"]:focus { outline: none; background: transparent; color: var(--btn); transform: scale(1.05); }
+
+  /* ================== الأزرار (تصميم Apple-like) ================== */
+  .actions { display: flex; flex-wrap: wrap; gap: 12px; position: relative; z-index: 3; }
+  button { font-family: inherit; font-weight: 800; display: flex; align-items: center; justify-content: center; gap: 8px; transition: all 0.3s ease; border: none;}
+  
+  button.primary { flex: 1 1 100%; padding: 18px; border-radius: 18px; background: var(--btn); color: var(--btnText); font-size: 17px; cursor: pointer; box-shadow: 0 4px 15px rgba(234,179,8,0.2); }
+  button.primary:hover { background: var(--btn-hover); transform: translateY(-2px); box-shadow: 0 8px 20px rgba(234,179,8,0.4); }
+  
+  button.primary.smart { background: var(--accent); color: white; box-shadow: 0 4px 15px rgba(153,27,27,0.2); flex: 1 1 45%; }
+  button.primary.smart:hover { background: var(--accent-hover); box-shadow: 0 8px 20px rgba(153,27,27,0.4); }
+  
+  button.secondary { flex: 1 1 30%; padding: 14px; border: 1px solid var(--border); border-radius: 14px; background: var(--input); color: var(--text); font-size: 15px; cursor: pointer; }
+  button.secondary:hover { background: var(--card); border-color: var(--muted); transform: translateY(-2px); }
+
+  /* ================== بطاقة النتائج النظيفة ================== */
+  .out { display:none; margin-top: 24px; }
+  .out.show { display: block; animation: slideInUp 0.5s ease forwards; }
+  .result-card { padding: 20px; border-radius: 20px; border: 1px solid var(--border); background: var(--card); box-shadow: 0 8px 25px var(--shadow); }
+  .result-head { font-size: 16px; font-weight: 800; margin-bottom: 16px; text-align: center; color: var(--muted);}
+  .result-head span { color: var(--btn); font-size: 24px; display: block; margin-top: 4px; font-weight: 900;}
+  
+  .result-stats { display: flex; justify-content: space-around; align-items: center; padding: 16px; background: var(--input); border-radius: 16px; margin-bottom: 16px; border: 1px solid var(--border); }
+  .stat-box { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+  .stat-box img { width: 45px; height: 45px; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.2)); }
+  .stat-box span { font-size: 16px; font-weight: 800; background: var(--card); padding: 4px 12px; border-radius: 8px; border: 1px solid var(--border); }
+  .stat-vs { font-size: 20px; font-weight: 900; color: var(--muted); opacity: 0.5; }
+  
+  .result-reason { font-size: 15px; line-height: 1.8; font-weight: 700; padding: 16px; background: rgba(0,0,0,0.03); border-radius: 16px; border-right: 4px solid var(--btn); color: var(--text);}
+  .dark .result-reason { background: rgba(255,255,255,0.03); }
+  
+  .out.error { display: block; background: var(--error-bg); color: var(--error-text); border: 1px solid var(--error-border); padding: 16px; border-radius: 16px; font-weight: 800; text-align: center;}
+
+  /* ================== التحليل الذكي ================== */
+  .smartBox { margin-top: 24px; padding: 24px; border-radius: 20px; background: var(--card); border: 1px solid var(--accent); text-align: start; display:none; animation: slideInUp 0.5s ease; box-shadow: 0 8px 25px rgba(153,27,27,0.1); }
+  .smartBox h3 { margin: 0 0 16px 0; font-size: 20px; font-weight: 900; color: var(--accent); display: flex; align-items: center; gap:8px; }
+  .smartBox .pill { background: var(--input); border: 1px solid var(--border); padding: 12px 16px; font-size: 15px; border-radius: 12px; font-weight: 800; margin-bottom: 12px; display: block;}
+  .smartWhyText { font-size: 15px; font-weight: 700; padding-top: 16px; border-top: 1px solid var(--border); line-height: 1.8;}
+  .smartWhyText ul { margin: 10px 0; padding-inline-start: 24px; }
+  .smartWhyText li::marker { color: var(--accent); }
+
+  /* ================== الرسم البياني الدائري ================== */
+  .chartWrap { margin-top: 24px; display: flex; gap: 20px; align-items: stretch; justify-content: center; flex-wrap: wrap; padding: 24px; background: var(--card); border-radius: 24px; border: 1px solid var(--border); box-shadow: 0 8px 25px var(--shadow); animation: slideInUp 0.6s ease;}
+  .chartCard { flex: 0 0 auto; width: 220px; height: 220px; display: flex; align-items: center; justify-content: center; position: relative; }
+  canvas#chart { width: 200px; height: 200px; filter: drop-shadow(0 4px 8px rgba(0,0,0,0.2)); }
+  .chartCenter { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; pointer-events: none;}
+  .chartCenter .ratio { font-size: 32px; font-weight: 900; color: var(--text); }
+  .chartCenter .small { font-size: 13px; font-weight: 700; color: var(--muted); }
+  
+  .legend { flex: 1 1 200px; min-width: 200px; display: flex; flex-direction: column; justify-content: center; }
+  .legend h3 { margin: 0 0 16px 0; font-size: 16px; color: var(--muted); font-weight: 800; text-align: center;}
+  .row { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; border-radius: 16px; background: var(--input); border: 1px solid var(--border); margin: 6px 0; transition: transform 0.2s ease;}
+  .row:hover { transform: scale(1.02); border-color: var(--btn);}
+  .left { display: flex; align-items: center; gap: 12px; font-weight: 800; font-size: 16px; }
+  .pct { font-weight: 900; font-size: 18px; color: var(--text); }
+
+  /* ================== الإشعارات والفوتر ================== */
+  .toast { position: fixed; left: 50%; bottom: 30px; transform: translateX(-50%) translateY(20px); background: var(--text); color: var(--bg-grad-1); padding: 14px 28px; border-radius: 999px; box-shadow: 0 10px 30px rgba(0,0,0,0.2); opacity: 0; pointer-events: none; transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); z-index: 9999; font-weight: 800; font-size: 15px;}
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  .signature { margin-top: 30px; text-align: center; font-size: 14px; padding: 20px; color: var(--muted); font-weight: 700; position: relative; z-index: 2;}
+  .signature span { font-weight: 900; font-size: 16px; color: var(--btn); margin-left: 4px;}
+</style>
+</head>
+
+<body>
+
+<div class="wave-container">
+  <svg viewBox="0 0 1440 320" preserveAspectRatio="none">
+    <path fill-opacity="0.3" d="M0,160L48,144C96,128,192,96,288,106.7C384,117,480,171,576,197.3C672,224,768,224,864,197.3C960,171,1056,117,1152,101.3C1248,85,1344,107,1392,117.3L1440,128L1440,0L1392,0Z"></path>
+    <path fill-opacity="0.6" d="M0,256L48,229.3C96,203,192,149,288,154.7C384,160,480,224,576,224C672,224,768,160,864,144C960,128,1056,160,1152,176C1248,192,1344,192,1392,192L1440,192L1440,0L1392,0Z"></path>
+  </svg>
+</div>
+
+<div id="particles" class="particles-container"></div>
+
+<header class="sticky-header">
+  <div class="topbar">
+    <div class="langBtns" role="group" aria-label="Language">
+      <button class="langBtn active" type="button" id="btn-ar" onclick="setLang('ar')">🇸🇦 العربية</button>
+      <button class="langBtn" type="button" id="btn-en" onclick="setLang('en')">🇺🇸 English</button>
+      <button class="langBtn" type="button" id="btn-pt" onclick="setLang('pt')">🇧🇷 Português</button>
+    </div>
+    <div class="toggles">
+      <button class="toggleBtn" type="button" id="darkBtn" onclick="toggleDark()">🌙 الوضع الداكن</button>
+    </div>
+  </div>
+  
+  <nav class="tabs">
+    <button class="tab-btn active" id="tabBtnAnalysis" onclick="switchTab('analysis')">تحليل التقرير</button>
+    <button class="tab-btn" id="tabBtnHistory" onclick="switchTab('history')">سجل العمليات</button>
+    <button class="tab-btn" id="tabBtnSettings" onclick="switchTab('settings')">الإعدادات</button>
+  </nav>
+</header>
+
+<div class="main-container">
+
+  <div id="tab-analysis" class="tab-content active">
+
+    <div class="hero-container slide-up delay-1">
+      <img src="camp.png" alt="Daly Camp" class="hero-image" onerror="this.style.display='none'">
+    </div>
+
+    <h2 id="title" class="slide-up delay-1">
+      <span class="daly-text">Daly</span><span class="alpha-badge">ALPHA</span>
+    </h2>
+
+    <div class="muted-title slide-up delay-1" id="hint">
+      اكتب مثل: <span class="pill">360.0k</span> <span class="pill">1.1m</span>
+    </div>
+
+    <div class="box glass slide-up delay-2">
+      
+      <div class="loading-overlay" id="loadingOverlay">
+        <div class="spinner"></div>
+        <div id="loadingText" style="font-size: 16px; font-weight: 800;">🤖 جاري تحليل التقرير بدقة...</div>
+      </div>
+
+      <div class="upload-section" id="uploadArea">
+        <div class="upload-header" id="uploadText">رفع تقرير الاستطلاع</div>
+
+        <div class="upload-btns">
+          <div class="upload-btn gallery">
+            <input type="file" id="imageInputGallery" accept="image/*" onchange="handleImageUpload(event)">
+            <div class="upload-icon-circle">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <rect x="2" y="4" width="20" height="16" rx="3" fill="white" opacity="0.2"/>
+                <rect x="2" y="4" width="20" height="16" rx="3" stroke="white" stroke-width="2"/>
+                <circle cx="8.5" cy="10" r="2" fill="white"/>
+                <path d="M2 17.5l5.5-5.5 4 4 3-3.5L22 18" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </div>
+            <div class="upload-btn-label" id="uploadLblGallery">ألبوم الصور</div>
+          </div>
+
+          <div class="upload-btn camera">
+            <input type="file" id="imageInputCamera" accept="image/*" capture="environment" onchange="handleImageUpload(event)">
+            <div class="upload-icon-circle">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M9.5 3.5L8 6H4a2 2 0 00-2 2v10a2 2 0 002 2h16a2 2 0 002-2V8a2 2 0 00-2-2h-4l-1.5-2.5h-5z" fill="white" opacity="0.2" stroke="white" stroke-width="2" stroke-linejoin="round"/>
+                <circle cx="12" cy="13" r="3.5" stroke="white" stroke-width="2"/>
+              </svg>
+            </div>
+            <div class="upload-btn-label" id="uploadLblCamera">فتح الكاميرا</div>
+          </div>
+        </div>
+
+        <div class="upload-preview" id="uploadPreview">
+          <img class="upload-preview-thumb" id="uploadThumb" src="" alt="preview">
+          <div class="upload-preview-info">
+            <div class="upload-preview-name" id="uploadFileName">—</div>
+            <div class="upload-preview-size" id="uploadFileSize">—</div>
+          </div>
+          <button class="upload-preview-close" onclick="clearUpload()" title="إلغاء">✕</button>
+        </div>
+      </div>
+
+      <div class="inputs-container">
+        <div class="input-wrapper">
+          <label id="lblSni">
+            <img src="sniper.png" class="game-icon" alt="sniper" onerror="this.style.display='none'">
+            <span>قناص دالي</span>
+          </label>
+          <input id="enSni" type="text" placeholder="مثال: 360k" />
+        </div>
+
+        <div class="input-wrapper">
+          <label id="lblInf">
+            <img src="fighter.png" class="game-icon" alt="fighter" onerror="this.style.display='none'">
+            <span>مقاتل دالي</span>
+          </label>
+          <input id="enInf" type="text" placeholder="مثال: 360k" />
+        </div>
+
+        <div class="input-wrapper">
+          <label id="lblCav">
+            <img src="cavalry.png" class="game-icon" alt="cavalry" onerror="this.style.display='none'">
+            <span>جوال دالي</span>
+          </label>
+          <input id="enCav" type="text" placeholder="مثال: 1.1m" />
+        </div>
+      </div>
+
+      <div class="actions">
+        <button class="primary" onclick="calc()" id="calcBtn">⚔️ النسبة المثالية للهجوم</button>
+        <button class="primary smart" onclick="smartAnalyze()" id="smartBtn">🧠 تحليل تكتيكي ذكي</button>
+        <button class="secondary" onclick="copyResult()" id="copyBtn">📋 نسخ النتيجة</button>
+        <button class="secondary" onclick="shareResult()" id="shareBtn">🔗 مشاركة</button>
+        <button class="secondary" onclick="resetAll()" id="resetBtn">♻️ مسح الحقول</button>
+      </div>
+
+      <div id="out" class="out"></div>
+      <div id="smartBox" class="smartBox"></div>
+      
+      <div class="chartWrap" id="chartWrap" style="display:none">
+        <div class="chartCard">
+          <canvas id="chart" width="200" height="200"></canvas>
+          <div class="chartCenter">
+            <div class="ratio" id="ratioText">70 / 30</div>
+            <div class="small" id="ratioHint">التوزيع</div>
+          </div>
+        </div>
+        <div class="legend">
+          <h3 id="legendTitle">تشكيل الهجوم الموصى به</h3>
+          <div class="row">
+            <div class="left">
+              <img id="iconA" class="game-icon" src="sniper.png" style="width:32px;height:32px;" onerror="this.style.display='none'">
+              <span id="nameA">قناص</span>
+            </div>
+            <div class="pct" id="pctA" style="color: var(--btn);">70%</div>
+          </div>
+          <div class="row">
+            <div class="left">
+              <img id="iconB" class="game-icon" src="fighter.png" style="width:32px;height:32px;" onerror="this.style.display='none'">
+              <span id="nameB">مقاتل</span>
+            </div>
+            <div class="pct" id="pctB" style="color: var(--accent);">30%</div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <div id="tab-history" class="tab-content">
+    <div class="box glass slide-up" style="text-align: center; padding: 60px 20px;">
+      <h3 style="color: var(--muted); margin-bottom: 10px;" id="historySoon">⏳ سجل العمليات قريباً...</h3>
+    </div>
+  </div>
+
+  <div id="tab-settings" class="tab-content">
+    <div class="box glass slide-up" style="text-align: center; padding: 60px 20px;">
+      <h3 style="color: var(--muted); margin-bottom: 10px;" id="settingsSoon">⚙️ الإعدادات قريباً...</h3>
+    </div>
+  </div>
+
+  <div class="signature slide-up delay-2" id="sig">تم البرمجة والتطوير بواسطة <span>F11</span></div>
+
+</div>
+
+<div class="toast" id="toast">✅</div>
+
+<script>
+/* ================== تأثيرات الجزيئات الناعمة ================== */
+function initParticles() {
+  const container = document.getElementById('particles');
+  if(!container) return;
+  container.innerHTML = '';
+  const count = 25; 
+  for (let i = 0; i < count; i++) {
+    const p = document.createElement('div');
+    p.className = 'particle';
+    const size = Math.random() * 4 + 2; 
+    p.style.width = size + 'px';
+    p.style.height = size + 'px';
+    p.style.left = Math.random() * 100 + 'vw';
+    p.style.animationDuration = (Math.random() * 6 + 4) + 's'; 
+    p.style.animationDelay = (Math.random() * 3) + 's';
+    container.appendChild(p);
+  }
+}
+
+function switchTab(tabId) {
+  document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+  document.getElementById('tab-' + tabId).classList.add('active');
+  const btnId = tabId.charAt(0).toUpperCase() + tabId.slice(1);
+  document.getElementById('tabBtn' + btnId).classList.add('active');
+}
+
+function safeSetStorage(key, value) { try { localStorage.setItem(key, value); } catch (e) { } }
+function safeGetStorage(key) { try { return localStorage.getItem(key); } catch (e) { return null; } }
+
+function showSiteError(msg) {
+    const outEl = document.getElementById("out");
+    outEl.innerHTML = "❌ " + msg;
+    outEl.classList.add("error", "show");
+    toast("❌ " + ((T[LANG] || T.ar).toastError || "خطأ"));
+    hideChart();
+    document.getElementById("smartBox").style.display = "none";
+}
+
+function showUploadPreview(file) {
+    const preview = document.getElementById("uploadPreview");
+    if (!preview) return;
+    document.getElementById("uploadThumb").src = URL.createObjectURL(file);
+    document.getElementById("uploadFileName").innerText = file.name.length > 25 ? file.name.substring(0,22)+"..." : file.name;
+    const kb = (file.size / 1024).toFixed(0);
+    document.getElementById("uploadFileSize").innerText = kb > 1024 ? (kb/1024).toFixed(1)+" MB" : kb+" KB";
+    preview.classList.add("show");
+}
+function clearUpload() {
+    document.getElementById("uploadPreview").classList.remove("show");
+    document.querySelectorAll('.upload-btn input[type="file"]').forEach(i => i.value = "");
+}
+
+/* ================== دوال OCR الأساسية ================== */
+function otsuThreshold(gray) {
+    const hist = new Array(256).fill(0);
+    for (let i = 0; i < gray.length; i++) hist[gray[i]]++;
+    const total = gray.length; let sum = 0;
+    for (let i = 0; i < 256; i++) sum += i * hist[i];
+    let sumB = 0, wB = 0, maxVar = 0, bestT = 128;
+    for (let t = 0; t < 256; t++) {
+        wB += hist[t]; if (wB === 0) continue;
+        const wF = total - wB; if (wF === 0) break;
+        sumB += t * hist[t];
+        const v = wB * wF * Math.pow(sumB/wB - (sum-sumB)/wF, 2);
+        if (v > maxVar) { maxVar = v; bestT = t; }
+    }
+    return bestT;
+}
+
+function makeOtsuImage(file, scale) {
+    return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => {
+            const sY = Math.floor(img.height * 0.1);
+            const sH = Math.floor(img.height * 0.8);
+            const W = Math.round(img.width * scale), H = Math.round(sH * scale);
+            const canvas = document.createElement('canvas'); const ctx = canvas.getContext('2d');
+            canvas.width = W; canvas.height = H;
+            ctx.drawImage(img, 0, sY, img.width, sH, 0, 0, W, H);
+            const imgData = ctx.getImageData(0, 0, W, H); const d = imgData.data; const len = W * H;
+            const gray = new Uint8Array(len);
+            for (let i = 0; i < len; i++) gray[i] = Math.round(0.299*d[i*4] + 0.587*d[i*4+1] + 0.114*d[i*4+2]);
+            const thr = otsuThreshold(gray); let darkCount = 0;
+            for (let i = 0; i < len; i++) {
+                const val = gray[i] > thr ? 255 : 0;
+                d[i*4] = d[i*4+1] = d[i*4+2] = val;
+                if (val === 0) darkCount++;
+            }
+            if (darkCount > len * 0.5) { for (let i = 0; i < len; i++) d[i*4] = d[i*4+1] = d[i*4+2] = 255 - d[i*4]; }
+            ctx.putImageData(imgData, 0, 0);
+            canvas.toBlob(blob => { resolve(blob); URL.revokeObjectURL(img.src); }, 'image/png');
+        };
+        img.onerror = () => reject(new Error("فشل تحميل الصورة"));
+        img.src = URL.createObjectURL(file);
+    });
+}
+
+function makeNumberImage(file, scale, top, bottom, left, right) {
+    return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => {
+            const sX = Math.floor(img.width * left), sY = Math.floor(img.height * top);
+            const sW = Math.floor(img.width * (right - left)), sH = Math.floor(img.height * (bottom - top));
+            if (sW < 5 || sH < 5) { resolve(null); return; }
+            const W = Math.round(sW * scale), H = Math.round(sH * scale);
+            const c1 = document.createElement('canvas'); const ctx = c1.getContext('2d');
+            c1.width = W; c1.height = H;
+            ctx.filter = 'grayscale(1) contrast(2.5) brightness(1.1)';
+            ctx.drawImage(img, sX, sY, sW, sH, 0, 0, W, H); ctx.filter = 'none';
+            const imgData = ctx.getImageData(0, 0, W, H); const d = imgData.data, len = W * H;
+            const gray = new Uint8Array(len);
+            for (let i = 0; i < len; i++) gray[i] = Math.round(0.299*d[i*4] + 0.587*d[i*4+1] + 0.114*d[i*4+2]);
+            const thr = otsuThreshold(gray); let darkCount = 0;
+            for (let i = 0; i < len; i++) {
+                const val = gray[i] > thr ? 255 : 0;
+                d[i*4] = d[i*4+1] = d[i*4+2] = val;
+                if (val === 0) darkCount++;
+            }
+            if (darkCount > len * 0.5) { for (let i = 0; i < len; i++) d[i*4] = d[i*4+1] = d[i*4+2] = 255 - d[i*4]; }
+            ctx.putImageData(imgData, 0, 0);
+            const pad = 30; const c2 = document.createElement('canvas'); const p = c2.getContext('2d');
+            c2.width = W + pad*2; c2.height = H + pad*2;
+            p.fillStyle = '#fff'; p.fillRect(0, 0, c2.width, c2.height); p.drawImage(c1, pad, pad);
+            c2.toBlob(blob => { resolve(blob); URL.revokeObjectURL(img.src); }, 'image/png');
+        };
+        img.onerror = () => reject();
+        img.src = URL.createObjectURL(file);
+    });
+}
+
+function cleanTroopWord(t) {
+    if(!t) return null;
+    t = t.replace(/\s/g, '').replace(/[oO]/g, '0').replace(/[lI|!]/g, '1').toLowerCase();
+    t = t.replace(/[^0-9km.]/g, '').replace(/\.{2,}/g, '.');
+    const m = t.match(/(\d+\.?\d*[km])/i);
+    if (m) return m[1];
+    if (/^0+$/.test(t)) return '0';
+    if (/^(\d+\.?\d*)$/.test(t)) return t;
+    return null;
+}
+
+function extractTroopsFromWords(words, imgHeight) {
+    const troopWords = [];
+    for (const w of (words || [])) {
+        if ((w.confidence || 0) < 15) continue;
+        const c = cleanTroopWord(w.text);
+        if (c) troopWords.push({ ...w, cleanVal: c });
+    }
+    if (troopWords.length < 2) return null;
+    troopWords.sort((a, b) => a.bbox.y0 - b.bbox.y0);
+    const yTol = Math.max(30, imgHeight * 0.05);
+    const rows = []; let currentRow = [troopWords[0]];
+    for (let i = 1; i < troopWords.length; i++) {
+        if (Math.abs(troopWords[i].bbox.y0 - currentRow[0].bbox.y0) < yTol) currentRow.push(troopWords[i]);
+        else { rows.push(currentRow); currentRow = [troopWords[i]]; }
+    }
+    rows.push(currentRow);
+    let best = rows.find(r => r.length === 3) || rows.find(r => r.length === 2);
+    if (!best) return null;
+    best.sort((a, b) => a.bbox.x0 - b.bbox.x0);
+    const vals = best.map(w => w.cleanVal);
+    while (vals.length < 3) vals.push('0');
+    return { fighter: vals[0], sniper: vals[1], cavalry: vals[2] };
+}
+
+async function runOCRPass(blob, params, logger) {
+    const worker = await Tesseract.createWorker('eng', 1, { logger });
+    if (params) await worker.setParameters(params);
+    const { data } = await worker.recognize(blob);
+    await worker.terminate();
+    return data;
+}
+
+function isValidTroop(v) { return /^\d+\.?\d*[km]$/i.test((v||"").toLowerCase()); }
+
+/* ============== معالجة رفع الصورة ============== */
+async function handleImageUpload(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    showUploadPreview(file);
+    document.getElementById("out").classList.remove("show", "error");
+
+    const overlay  = document.getElementById("loadingOverlay");
+    const loadText = document.getElementById("loadingText");
+    overlay.style.display = "flex";
+
+    try {
+        if (typeof Tesseract === "undefined") throw new Error("مكتبة الذكاء غير متاحة.");
+        
+        if (loadText) loadText.innerText = "تحسين جودة التقرير...";
+        const [imgFull, imgL, imgM, imgR] = await Promise.all([
+            makeOtsuImage(file, 2.5),
+            makeNumberImage(file, 4, 0.35, 0.75, 0.0, 0.35),
+            makeNumberImage(file, 4, 0.35, 0.75, 0.35, 0.65),
+            makeNumberImage(file, 4, 0.35, 0.75, 0.65, 1.0)
+        ]);
+
+        if (loadText) loadText.innerText = "جاري قراءة الأرقام...";
+        const numParams = { tessedit_char_whitelist: '0123456789.kKmM ', tessedit_pageseg_mode: '7' };
+        const [dataFull, dL, dM, dR] = await Promise.all([
+            runOCRPass(imgFull, { tessedit_pageseg_mode: '11' }, m => {
+                if (m.status === 'recognizing text' && loadText)
+                    loadText.innerText = `تحليل: ${Math.round((m.progress||0)*100)}%`;
+            }),
+            runOCRPass(imgL, numParams, ()=>{}),
+            runOCRPass(imgM, numParams, ()=>{}),
+            runOCRPass(imgR, numParams, ()=>{})
+        ]);
+
+        const imgH = (dataFull.words||[]).reduce((max, w) => Math.max(max, w.bbox.y1||0), 1);
+        const parsedFull = extractTroopsFromWords(dataFull.words, imgH) || {};
+        
+        const perNum = {
+            fighter: cleanTroopWord(dL.text) || '0',
+            sniper:  cleanTroopWord(dM.text) || '0',
+            cavalry: cleanTroopWord(dR.text) || '0'
+        };
+
+        let final = {};
+        for (const f of ['fighter','sniper','cavalry']) {
+            const pv = (perNum[f] || '0').toLowerCase();
+            const fv = (parsedFull[f] || '0').toLowerCase();
+            if (isValidTroop(pv)) final[f] = pv;
+            else if (isValidTroop(fv)) final[f] = fv;
+            else final[f] = (pv !== '0') ? pv : fv;
+        }
+
+        const inf = final.fighter || "0";
+        const sni = final.sniper  || "0";
+        const cav = final.cavalry || "0";
+
+        const isOK = v => /^\d+\.?\d*[km]$|^0$/.test(v);
+        if (![inf, sni, cav].some(isOK)) {
+            throw new Error((T[LANG]||T.ar).ocrFail);
+        }
+
+        document.getElementById("enInf").value = isOK(inf) ? inf : "0";
+        document.getElementById("enSni").value = isOK(sni) ? sni : "0";
+        document.getElementById("enCav").value = isOK(cav) ? cav : "0";
+
+        toast(`✅ تمت القراءة بنجاح`);
+        setTimeout(() => smartAnalyze(), 400);
+
+    } catch(err) {
+        showSiteError(err.message || "حدث خطأ أثناء المسح.");
+    } finally {
+        overlay.style.display = "none";
+    }
+}
+
+/* ================== الترجمات والنصوص (كامل اللغات) ================== */
+const T = {
+  ar: {
+    title: "<span class='daly-text'>Daly</span><span class='alpha-badge'>ALPHA</span>",
+    hintPrefix: "اكتب مثل:",
+    lblSni: "قناص دالي", lblInf: "مقاتل دالي", lblCav: "جوال دالي",
+    btn: "⚔️ النسبة المثالية للهجوم", copy: "📋 نسخ", copied: "✅ تم النسخ!",
+    err: "الرجاء إدخال قوات دالي أولاً.",
+    bestLine: "التشكيل المثالي",
+    reason1: "لماذا هذا التشكيل؟",
+    reason2: "النوع المهيمن للعدو هو", reason3: "وأفضل مضاد له هو",
+    reason4: "وتم إضافة", reason5: "لحمايته من الهجمات المضادة.",
+    sig: "تصميم وبرمجة",
+    toastReset: 'تم المسح', toastNeed: 'أدخل الأرقام أولاً', toastError: 'فشل قراءة الصورة',
+    smartTitle: "تحليل تكتيكي ذكي", smartSub: "قراءة متعمقة للتشكيلة واقتراح أفضل هجوم",
+    smartEnemy: "قوات العدو", smartRec: "الهجوم الأمثل", smartWhy: "السبب الرياضي:",
+    smartWhy1: "يعتبر المضاد الأقوى ضد", smartWhy2: "العدو يمتلك نسبة خطرة من",
+    smartWhy3: "لذلك تم التدعيم بـ", smartWhy4: "لا توجد تهديدات ثانوية تذكر في التقرير.",
+    smartWhy5: "النسبة المحسوبة رياضياً لتقليل الخسائر هي",
+    smartNote: "ملاحظة: تعتمد هذه الأرقام على حسابات (Counter) اللعبة للحد من الخسائر.",
+    uploadText: "رفع تقرير الاستطلاع",
+    uploadLblGallery: "ألبوم الصور", uploadLblCamera: "الكاميرا",
+    ocrFail: "الصورة غير واضحة، لم يتمكن الذكاء من رصد الأرقام."
+  },
+  en: {
+    title: "<span class='daly-text'>Daly</span><span class='alpha-badge'>ALPHA</span>",
+    hintPrefix: "Type like:",
+    lblSni: "Snipers", lblInf: "Fighters", lblCav: "Cavalry",
+    btn: "⚔️ Ideal Attack Ratio", copy: "📋 Copy", copied: "✅ Copied!",
+    err: "Please enter enemy troops first.",
+    bestLine: "Ideal Formation",
+    reason1: "Why this choice?",
+    reason2: "The dominant enemy type is", reason3: "and the best counter is",
+    reason4: "We added", reason5: "to protect from counter-attacks.",
+    sig: "Designed & Coded By",
+    toastReset: 'Cleared', toastNeed: 'Enter troops first.', toastError: 'Failed to read image',
+    smartTitle: "Smart Tactical Analysis", smartSub: "Deep read of formation to suggest best attack",
+    smartEnemy: "Enemy Troops", smartRec: "Optimal Attack", smartWhy: "Mathematical Reason:",
+    smartWhy1: "is the strongest counter to", smartWhy2: "The enemy has a dangerous amount of",
+    smartWhy3: "so we reinforced with", smartWhy4: "No significant secondary threats detected.",
+    smartWhy5: "The mathematically calculated ratio to minimize losses is",
+    smartNote: "Note: Ratios are based on game's counter mechanics to reduce deaths.",
+    uploadText: "Upload Scout Report",
+    uploadLblGallery: "Gallery", uploadLblCamera: "Camera",
+    ocrFail: "Image unclear. Troops could not be detected."
+  },
+  pt: {
+    title: "<span class='daly-text'>Daly</span><span class='alpha-badge'>ALPHA</span>",
+    hintPrefix: "Digite:",
+    lblSni: "Atirador", lblInf: "Lutador", lblCav: "Cavalaria",
+    btn: "⚔️ Ataque Recomendado", copy: "📋 Copiar", copied: "✅ Copiado!",
+    err: "Insira as tropas inimigas primeiro.",
+    bestLine: "Formação Ideal",
+    reason1: "Por que essa escolha?",
+    reason2: "O tipo dominante é", reason3: "e o melhor contra-ataque é",
+    reason4: "Adicionamos", reason5: "para proteger contra-ataques.",
+    sig: "Desenvolvido Por",
+    toastReset: 'Limpo', toastNeed: 'Insira tropas primeiro.', toastError: 'Falha ao ler',
+    smartTitle: "Análise Tática", smartSub: "Leitura profunda para a melhor estratégia",
+    smartEnemy: "Inimigos", smartRec: "Ataque Ideal", smartWhy: "Motivo Matemático:",
+    smartWhy1: "é o melhor contra", smartWhy2: "O inimigo tem uma quantidade perigosa de",
+    smartWhy3: "então reforçamos com", smartWhy4: "Nenhuma ameaça secundária detectada.",
+    smartWhy5: "A proporção calculada para minimizar perdas é",
+    smartNote: "Nota: Proporções baseadas na mecânica de counter do jogo.",
+    uploadText: "Enviar Relatório",
+    uploadLblGallery: "Galeria", uploadLblCamera: "Câmera",
+    ocrFail: "Imagem pouco clara. Números não detectados."
+  }
+};
+
+let LANG = "ar"; let LAST_COPY_TEXT = "";
+
+function setActiveBtn(lang) {["ar","en","pt"].forEach(l => { 
+    const el = document.getElementById("btn-" + l); 
+    if(el) el.classList.toggle("active", l === lang); 
+  }); 
+}
+
+function setLang(lang) {
+  if (!T[lang]) lang = "ar"; LANG = lang; safeSetStorage("F11_LANG", lang); 
+  const t = T[lang];
+  document.getElementById("title").innerHTML = t.title;
+  document.querySelector("#lblSni span").innerText = t.lblSni;
+  document.querySelector("#lblInf span").innerText = t.lblInf;
+  document.querySelector("#lblCav span").innerText = t.lblCav;
+  document.getElementById("calcBtn").innerHTML = t.btn;
+  document.getElementById("smartBtn").innerHTML = "🧠 " + t.smartTitle;
+  document.getElementById("copyBtn").innerHTML = t.copy;
+  document.getElementById("uploadText").innerText = t.uploadText;
+  if(t.uploadLblGallery) {
+    document.getElementById("uploadLblGallery").innerText = t.uploadLblGallery;
+    document.getElementById("uploadLblCamera").innerText = t.uploadLblCamera;
+  }
+  document.getElementById("sig").innerHTML = `${t.sig} <span>F11</span>`;
+  
+  if(document.getElementById("out").classList.contains("show")) calc(true);
+  
+  document.documentElement.dir = (lang === "ar") ? "rtl" : "ltr";
+  document.documentElement.lang = lang;
+  
+  if(LAST_REC) showChart(LAST_REC.A, LAST_REC.B, LAST_REC.aShare, LAST_REC.bShare);
+  refreshDarkButtonText(); setActiveBtn(lang);
+}
+
+function refreshDarkButtonText() {
+  const isDark = document.body.classList.contains("dark");
+  document.getElementById("darkBtn").innerText = isDark ? "☀️ " + (LANG==='ar'?'الوضع الفاتح':'Light Mode') : "🌙 " + (LANG==='ar'?'الوضع الداكن':'Dark Mode');
+}
+
+function toggleDark() {
+  try {
+    document.body.classList.toggle("dark"); 
+    safeSetStorage("F11_DARK", document.body.classList.contains("dark") ? "1" : "0");
+    refreshDarkButtonText(); 
+    if (LAST_REC) showChart(LAST_REC.A, LAST_REC.B, LAST_REC.aShare, LAST_REC.bShare);
+  } catch(e) { }
+}
+
+function parseNum(v) {
+  v = (v||"").toString().toLowerCase().trim().replace(/,/g,"");
+  if(v.endsWith("k")) return (parseFloat(v)||0) * 1000;
+  if(v.endsWith("m")) return (parseFloat(v)||0) * 1000000;
+  return parseFloat(v)||0;
+}
+
+const counterOf = { sni:"cav", inf:"sni", cav:"inf" };
+const beatenBy  = { cav:"inf", sni:"cav", inf:"sni" };
+function pct(x) { return Math.round(x*100); }
+function typeText(type) { const t = T[LANG]; if(type==="sni") return t.sni; if(type==="inf") return t.inf; return t.cav; }
+
+/* ================== الحسابات وبطاقة النتائج ================== */
+function showOutHTML(htmlContent, copyLine) { 
+  const outEl = document.getElementById("out"); 
+  outEl.classList.remove("error", "show");
+  outEl.innerHTML = htmlContent; 
+  void outEl.offsetWidth; 
+  outEl.classList.add("show"); 
+  if(copyLine !== undefined) LAST_COPY_TEXT = copyLine; 
+}
+
+function calc(isSilent = false) {
+  const vSni = document.getElementById("enSni").value;
+  const vInf = document.getElementById("enInf").value;
+  const vCav = document.getElementById("enCav").value;
+  const en = { sni: parseNum(vSni), inf: parseNum(vInf), cav: parseNum(vCav) };
+  const total = en.sni + en.inf + en.cav;
+  const t = T[LANG] || T.ar;
+  
+  if(!isSilent) document.getElementById("smartBox").style.display = "none";
+  if(total <= 0) { if(!isSilent) showSiteError(t.err); return; }
+
+  let major = "sni"; 
+  if(en.inf > en[major]) major = "inf"; 
+  if(en.cav > en[major]) major = "cav";
+  
+  const A = counterOf[major]; 
+  const danger = beatenBy[A]; 
+  const B = counterOf[danger];
+  const dangerRatio = en[danger] / total;
+  
+  let aShare;
+  if(dangerRatio < 0.18) aShare = 0.80; else if(dangerRatio < 0.30) aShare = 0.70; else if(dangerRatio < 0.45) aShare = 0.65; else aShare = 0.60;
+  if(B === A) aShare = 1.0;
+  const bShare = Math.max(0, 1 - aShare);
+
+  LAST_COPY_TEXT = `${typeText(A)} ${pct(aShare)}% + ${typeText(B)} ${pct(bShare)}%`;
+  
+  const html = `
+    <div class="result-card">
+      <div class="result-head">🎯 ${t.bestLine} <br> <span>${LAST_COPY_TEXT}</span></div>
+      <div class="result-stats">
+        <div class="stat-box"><img src="fighter.png"> <span>${vInf||'0'}</span></div>
+        <div class="stat-vs">VS</div>
+        <div class="stat-box"><img src="sniper.png"> <span>${vSni||'0'}</span></div>
+        <div class="stat-vs">VS</div>
+        <div class="stat-box"><img src="cavalry.png"> <span>${vCav||'0'}</span></div>
+      </div>
+      <div class="result-reason">
+        <b>${t.reason1}</b><br>
+        ${t.reason2} <b>${typeText(major)}</b>، ${t.reason3} <b style="color:var(--btn); font-size:16px">${typeText(A)}</b>.<br>
+        ${aShare < 1 ? `${t.reason4} <b style="color:var(--btn); font-size:16px">${typeText(B)}</b> ${t.reason5}` : ""}
+      </div>
+    </div>
+  `;
+  showOutHTML(html, LAST_COPY_TEXT); 
+  showChart(A, B, aShare, bShare);
+}
+
+function smartAnalyze() {
+  const sni = parseNum(document.getElementById("enSni").value);
+  const inf = parseNum(document.getElementById("enInf").value);
+  const cav = parseNum(document.getElementById("enCav").value);
+  const box = document.getElementById("smartBox"); 
+  if(!box) return;
+  const t = T[LANG] || T.ar; const total = sni + inf + cav;
+  if(!total) { box.style.display="none"; showSiteError(t.err); return; }
+
+  const e =[sni/total, inf/total, cav/total];
+  const counter =[2,0,1]; const losesTo =[2,0,1];      
+  const typeLabel = (i) => { if(i===0) return t.sni; if(i===1) return t.inf; return t.cav; };
+  const typeKey = (i) => { if(i===0) return "sni"; if(i===1) return "inf"; return "cav"; };
+
+  let E1 = 0; for(let i=1; i<3; i++) if(e[i] > e[E1]) E1 = i;
+  const P = counter[E1], V = losesTo[P], S = counter[V], dominance = e[E1], vShare = e[V];
+
+  let primaryPct = 70 + (dominance - 0.50)*30 - vShare*40;
+  primaryPct = Math.max(55, Math.min(85, primaryPct)); 
+  primaryPct = Math.round(primaryPct/5)*5; 
+  primaryPct = Math.max(55, Math.min(85, primaryPct));
+  const secondaryPct = 100 - primaryPct;
+
+  const whyLines =[];
+  whyLines.push(`<li><b>${typeLabel(P)}</b> ${t.smartWhy1} ${typeLabel(E1)}.</li>`);
+  if(vShare > 0.18) whyLines.push(`<li>${t.smartWhy2} ${typeLabel(V)} (${Math.round(vShare*100)}%). ${t.smartWhy3} <b style="color:var(--btn)">${typeLabel(S)}</b>.</li>`); 
+  else whyLines.push(`<li>${t.smartWhy4}</li>`); 
+  whyLines.push(`<li>${t.smartWhy5} <b style="color:var(--accent); font-size:16px">${primaryPct}/${secondaryPct}</b>.</li>`);
+
+  box.innerHTML = `
+    <h3><span style="font-size:24px">🧠</span> ${t.smartTitle}</h3>
+    <div class="muted" style="margin-bottom:15px">${t.smartSub}</div>
+    <div class="pill">🎯 ${t.smartEnemy}: &nbsp; ${t.sni} ${Math.round(e[0]*100)}% &nbsp;·&nbsp; ${t.inf} ${Math.round(e[1]*100)}% &nbsp;·&nbsp; ${t.cav} ${Math.round(e[2]*100)}%</div>
+    <div class="pill" style="border-color:var(--btn)">✅ ${t.smartRec}: <b style="margin: 0 5px; color:var(--btn)">${typeLabel(P)} ${primaryPct}%</b> + <b style="margin: 0 5px; color:var(--btn)">${typeLabel(S)} ${secondaryPct}%</b></div>
+    <div class="smartWhyText">
+      <div style="font-weight:900; color:var(--accent);">${t.smartWhy}</div>
+      <ul>${whyLines.join("")}</ul>
+      <div style="margin-top:14px;opacity:0.8;font-size:12px; color:var(--muted)">${t.smartNote}</div>
+    </div>
+  `;
+  box.style.display = "block";
+  LAST_COPY_TEXT = `${typeLabel(P)} ${primaryPct}% + ${typeLabel(S)} ${secondaryPct}%`;
+  document.getElementById("out").classList.remove("show");
+  showChart(typeKey(P), typeKey(S), primaryPct/100, secondaryPct/100);
+}
+
+async function copyResult() {
+  const t = T[LANG] || T.ar; 
+  if(!LAST_COPY_TEXT) { toast(t.toastNeed); return; }
+  try { await navigator.clipboard.writeText(LAST_COPY_TEXT); toast(t.copied); } 
+  catch(e) { const ta = document.createElement("textarea"); ta.value = LAST_COPY_TEXT; document.body.appendChild(ta); ta.select(); document.execCommand("copy"); document.body.removeChild(ta); toast(t.copied); }
+}
+
+const TYPE_ICON = { sni:"sniper.png", inf:"fighter.png", cav:"cavalry.png" };
+let LAST_REC = null; let donutAnimFrame = null;
+
+function hideChart() { document.getElementById("chartWrap").style.display = "none"; LAST_REC = null; }
+
+function showChart(A, B, aShare, bShare) {
+  LAST_REC = {A,B,aShare,bShare}; 
+  document.getElementById("ratioText").innerText = `${pct(aShare)} / ${pct(bShare)}`; 
+  document.getElementById("nameA").innerText = typeText(A); document.getElementById("nameB").innerText = typeText(B); 
+  document.getElementById("iconA").src = TYPE_ICON[A]; document.getElementById("iconB").src = TYPE_ICON[B]; 
+  document.getElementById("pctA").innerText = `${pct(aShare)}%`; document.getElementById("pctB").innerText = `${pct(bShare)}%`; 
+  drawDonut(A, B, aShare); document.getElementById("chartWrap").style.display = "flex";
+}
+
+function drawDonut(typeA, typeB, aShare) {
+  const canvas = document.getElementById("chart"); const ctx = canvas.getContext("2d"); 
+  const W = canvas.width, H = canvas.height, cx = W/2, cy = H/2, r = Math.min(W,H)/2 - 20, thickness = 22;
+  const isDark = document.body.classList.contains("dark");
+  
+  // ألوان تناسب التصميم النظيف
+  const colorA = isDark ? "#eab308" : "#d4af37";
+  const colorB = isDark ? "#b91c1c" : "#991b1b";
+
+  if (donutAnimFrame) cancelAnimationFrame(donutAnimFrame); 
+  let start = null; 
+  function animate(timestamp) {
+    if (!start) start = timestamp; let prog = Math.min((timestamp - start)/1200, 1);
+    const ease = prog === 1 ? 1 : 1 - Math.pow(2, -10 * prog); 
+    ctx.clearRect(0, 0, W, H); 
+    ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI*2); ctx.strokeStyle = isDark ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.05)"; ctx.lineWidth = thickness; ctx.stroke();
+    const startAngle = -Math.PI/2, aEnd = startAngle + (Math.PI*2 * aShare * ease); ctx.lineCap = "round";
+    if (aShare < 1) { const bEnd = aEnd + (Math.PI*2 * (1-aShare) * ease); ctx.beginPath(); ctx.arc(cx, cy, r, aEnd, bEnd); ctx.strokeStyle = colorB; ctx.stroke(); }
+    ctx.beginPath(); ctx.arc(cx, cy, r, startAngle, aEnd); ctx.strokeStyle = colorA; ctx.stroke();
+    if (prog < 1) donutAnimFrame = requestAnimationFrame(animate);
+  }
+  donutAnimFrame = requestAnimationFrame(animate);
+}
+
+function toast(msg) { const el = document.getElementById("toast"); el.innerText = msg; el.classList.add("show"); clearTimeout(toast._t); toast._t = setTimeout(()=> el.classList.remove("show"), 2500); }
+async function shareResult() { const t = T[LANG] || T.ar; if(!LAST_COPY_TEXT) { toast(t.toastNeed); return; } const text = `🎯 ${t.bestLine}\n${LAST_COPY_TEXT}\n\n${location.href}`; if(navigator.share) { try{ await navigator.share({ text }); toast(t.shared); return; } catch(e){} } try{ await navigator.clipboard.writeText(text); toast(t.shared); } catch(e){ toast(t.copied); } }
+function resetAll() { document.getElementById("enSni").value = ""; document.getElementById("enInf").value = ""; document.getElementById("enCav").value = ""; LAST_COPY_TEXT = ""; hideChart(); document.getElementById("smartBox").style.display = "none"; document.getElementById("out").classList.remove("show", "error"); clearUpload(); toast((T[LANG] || T.ar).toastReset); }
+
+/* ================== التهيئة ================== */
+document.addEventListener("DOMContentLoaded", function() {
+  initParticles(); 
+  try {
+    const savedLang = safeGetStorage("F11_LANG"); let autoLang = "ar"; 
+    try { const nl = (navigator.language||"").toLowerCase(); if(nl.startsWith("pt")) autoLang = "pt"; else if(nl.startsWith("en")) autoLang = "en"; } catch(e) {} 
+    setLang(savedLang || autoLang);
+    if(safeGetStorage("F11_DARK") === "1") document.body.classList.add("dark");
+    refreshDarkButtonText(); hideChart();
+  } catch(error) {}
+});
+</script>
+
+<script>
+  if ('serviceWorker' in navigator) { window.addEventListener('load', () => { navigator.serviceWorker.register('sw.js').catch(e=>{}); }); }
+</script>
+
+</body>
+</html>

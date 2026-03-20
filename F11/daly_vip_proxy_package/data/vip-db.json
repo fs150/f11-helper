@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "codes": [
+    {
+      "id": "a5c98e99-70d0-4f8d-9501-6970334cecd7",
+      "codeHash": "3581477fe98461f0f203e2676394cb80dddac088023b8819add5986202c1580c",
+      "codePreview": "DLYA-****-R9W2",
+      "label": "Ahmad",
+      "maxUses": 1,
+      "createdAt": "2026-03-06T18:11:41.875Z",
+      "expiresAt": "2026-03-16T18:11:41.874Z",
+      "revokedAt": null,
+      "notes": "",
+      "redemptions": []
+    }
+  ],
+  "sessions": []
+}
