@@ -784,34 +784,51 @@ body.dark .scout-icon-path {
   filter: drop-shadow(0 0 3px rgba(210,170,40,.60));
 }
 
-/* Upload button — solid pill (fixes black-box on mobile caused by background-clip:text) */
+/* Upload button text */
 .scout-upload-btn {
-  background: rgba(255, 255, 255, 0.85);
-  color: #555;
+  background: none;
   border: none;
-  border-radius: 20px;
-  padding: 8px 18px;
-  font-size: 13px;
-  font-weight: 700;
-  font-family: inherit;
-  letter-spacing: 0.03em;
+  padding: 0;
   cursor: pointer;
-  transition: background .25s ease, color .25s ease;
-}
-
-.scout-upload-btn:hover {
-  background: rgba(255, 255, 255, 0.97);
-  color: #333;
+  font-family: inherit;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  line-height: 1;
+  /* light mode: blue shimmer */
+  background: linear-gradient(
+    105deg,
+    #1a3a8f 0%, #2a56cc 20%, #4a80f0 38%,
+    #d0e4ff 48%, #f0f8ff 50%, #d0e4ff 52%,
+    #4a80f0 62%, #2a56cc 80%, #1a3a8f 100%
+  );
+  background-size: 250% auto;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  animation: dlTextShimmer 2.6s linear infinite;
+  filter: drop-shadow(0 0 5px rgba(80,130,240,.60));
+  transition: filter .3s ease;
 }
 
 body.dark .scout-upload-btn {
-  background: rgba(30, 25, 10, 0.75);
-  color: #e8c84a;
+  /* dark mode: gold gradient */
+  background: linear-gradient(180deg, #fff4c7 0%, #f5d97a 32%, #d4a63a 68%, #8f6b1d 100%);
+  background-size: 100% 100%;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  animation: none;
+  filter: drop-shadow(0 0 5px rgba(210,165,35,.55));
+}
+
+.scout-upload-btn:hover {
+  filter: drop-shadow(0 0 9px rgba(100,155,255,.95));
+  animation-duration: 1.5s;
 }
 
 body.dark .scout-upload-btn:hover {
-  background: rgba(40, 32, 12, 0.90);
-  color: #f5d97a;
+  filter: drop-shadow(0 0 9px rgba(230,185,50,.92));
 }
 
 /* Preview action buttons (Replace / Remove) */
@@ -3565,14 +3582,4 @@ body:not(.dark) textarea {
 body.dark #desert-effects,
 body[data-theme="dark"] #desert-effects {
   display: none;
-}
-
-/* ── Step 4: Mobile video fix ── */
-@media (max-width: 768px) {
-  #scoutVideo {
-    width: 100% !important;
-    height: 100% !important;
-    object-fit: cover !important;
-    object-position: center top !important;
-  }
 }
