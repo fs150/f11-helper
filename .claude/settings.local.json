@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git -C \"C:/Users/Admin/Desktop/F11/F11/F11 D\" status)"
+    ]
+  }
+}

@@ -78,7 +78,7 @@ const Translations = {
     uploadLabel: "صورة تقرير الاستطلاع",
     uploadGallery: "المعرض",
     uploadGallerySub: "اختر صورة من جهازك",
-    uploadSelect: "اختيار",
+    uploadSelect: "تحميل صورة",
     uploadReplace: "استبدال",
     uploadRemove: "إزالة",
     uploadStatusReady: "جاهز للقراءة",
@@ -113,6 +113,7 @@ const Translations = {
     btnCopy: "نسخ",
     btnShare: "مشاركة",
     btnReset: "إعادة ضبط",
+    btnDownload: "تحميل",
     
     // Output
     outputIdle: "أدخل قوات العدو واضغط الزر",
@@ -193,7 +194,7 @@ const Translations = {
     uploadLabel: "Scout Report Image",
     uploadGallery: "Gallery",
     uploadGallerySub: "Choose a scout report image",
-    uploadSelect: "Select",
+    uploadSelect: "Upload Image",
     uploadReplace: "Replace",
     uploadRemove: "Remove",
     uploadStatusReady: "Ready to read",
@@ -225,7 +226,8 @@ const Translations = {
     btnCopy: "Copy",
     btnShare: "Share",
     btnReset: "Reset",
-    
+    btnDownload: "Download",
+
     outputIdle: "Enter enemy troops and press the button",
     outputIdleIcon: "⚔️",
     error: "Enter enemy troops first",
@@ -296,7 +298,7 @@ const Translations = {
     uploadLabel: "Imagem do Relatório",
     uploadGallery: "Galeria",
     uploadGallerySub: "Escolha uma imagem do relatório",
-    uploadSelect: "Selecionar",
+    uploadSelect: "Enviar Imagem",
     uploadReplace: "Trocar",
     uploadRemove: "Remover",
     uploadStatusReady: "Pronto para ler",
@@ -328,7 +330,8 @@ const Translations = {
     btnCopy: "Copiar",
     btnShare: "Compartilhar",
     btnReset: "Redefinir",
-    
+    btnDownload: "Baixar",
+
     outputIdle: "Insira as tropas inimigas e pressione o botão",
     outputIdleIcon: "⚔️",
     error: "Insira as tropas inimigas primeiro",
@@ -621,8 +624,6 @@ const DalyApp = {
   lastCopyText: '',
   confirmCallback: null,
   tesseractLoaded: false,
-  _gallerySparkleTimer: 0,
-  _galleryWorkerResetTimer: 0,
   
   // ==========================================
   // INITIALIZATION
@@ -666,7 +667,7 @@ const DalyApp = {
     this.renderHistory();
     this.setupEventListeners();
     this.setupInputValidation();
-    this.setupPremiumGalleryButton();
+    this.setupUploadGalleryVideo();
     
     // Register service worker
     this.registerServiceWorker();
@@ -767,7 +768,21 @@ const DalyApp = {
     document.getElementById('btnReset')?.addEventListener('click', () => {
       this.confirmReset();
     });
-    
+
+    // Download image button
+    document.getElementById('btnDownload')?.addEventListener('click', (e) => {
+      // Ripple effect
+      const btn = e.currentTarget;
+      const r = btn.getBoundingClientRect();
+      const size = Math.max(r.width, r.height);
+      const ripple = document.createElement('span');
+      ripple.className = 'dl-ripple';
+      ripple.style.cssText = `width:${size}px;height:${size}px;left:${e.clientX - r.left - size/2}px;top:${e.clientY - r.top - size/2}px;`;
+      btn.appendChild(ripple);
+      ripple.addEventListener('animationend', () => ripple.remove());
+      this.downloadUploadedImage();
+    });
+
     // Result copy button
     document.getElementById('resultCopyBtn')?.addEventListener('click', () => {
       this.copyResult();
@@ -807,156 +822,42 @@ const DalyApp = {
     });
   },
 
-  // ==========================================
-  // PREMIUM GALLERY BUTTON
-  // ==========================================
-  prefersReducedMotion() {
-    return typeof window.matchMedia === 'function'
-      && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  },
+  setupUploadGalleryVideo() {
+    const button = document.getElementById('uploadCta');
+    const video = button?.querySelector('.pg-video');
+    const source = video?.querySelector('source');
+    const motionQuery = typeof window.matchMedia === 'function'
+      ? window.matchMedia('(prefers-reduced-motion: reduce)')
+      : null;
 
-  setupPremiumGalleryButton() {
-    const btn = document.getElementById('uploadCta');
-    const wrap = document.getElementById('uploadCtaWrap');
-    const image = document.getElementById('uploadCtaImage');
+    if (!button || !video) return;
 
-    if (!btn || !wrap || !image) return;
-
-    const renderWorker = () => this.renderPremiumGalleryWorker();
-    image.addEventListener('load', renderWorker);
-    if (image.complete && image.naturalWidth > 0) {
-      renderWorker();
-    }
-
-    btn.addEventListener('mouseenter', () => {
-      if (this.prefersReducedMotion()) return;
-      wrap.style.animation = 'none';
-      this.setPremiumGalleryWorkerAnimation('premiumGalleryWorkerHover 0.45s ease forwards');
-      this.spawnPremiumGalleryParticles(4, false);
-    });
-
-    btn.addEventListener('mouseleave', () => {
-      wrap.style.animation = '';
-      this.resetPremiumGalleryWorker();
-    });
-
-    btn.addEventListener('pointerdown', (event) => {
-      if (event.button !== 0) return;
-      this.triggerPremiumGalleryButtonFx();
-    });
-
-    btn.addEventListener('keydown', (event) => {
-      if (event.key === 'Enter' || event.key === ' ') {
-        this.triggerPremiumGalleryButtonFx();
+    const syncPlayback = () => {
+      if (document.hidden || motionQuery?.matches) {
+        video.pause();
+        return;
       }
+
+      const playPromise = video.play();
+      if (playPromise && typeof playPromise.catch === 'function') {
+        playPromise.catch(() => {});
+      }
+    };
+
+    const fallbackToPoster = () => {
+      button.classList.add('video-fallback');
+    };
+
+    video.addEventListener('loadeddata', () => {
+      button.classList.remove('video-fallback');
+      syncPlayback();
     });
+    video.addEventListener('error', fallbackToPoster);
+    source?.addEventListener('error', fallbackToPoster);
+    document.addEventListener('visibilitychange', syncPlayback);
+    motionQuery?.addEventListener?.('change', syncPlayback);
 
-    if (this._gallerySparkleTimer) {
-      clearInterval(this._gallerySparkleTimer);
-      this._gallerySparkleTimer = 0;
-    }
-
-    if (!this.prefersReducedMotion()) {
-      this._gallerySparkleTimer = window.setInterval(() => {
-        if (document.hidden || Math.random() >= 0.45) return;
-        this.spawnPremiumGalleryParticles(1, false);
-      }, 1400);
-    }
-  },
-
-  renderPremiumGalleryWorker() {
-    const image = document.getElementById('uploadCtaImage');
-    const workerCanvas = document.getElementById('uploadWorkerCanvas');
-    const ctx = workerCanvas?.getContext('2d');
-
-    if (!image || !workerCanvas || !ctx || !image.naturalWidth || !image.naturalHeight) return;
-
-    const nw = image.naturalWidth;
-    const nh = image.naturalHeight;
-    const rx = nw * 0.175;
-    const ry = nh * 0.310;
-    const rw = nw * 0.105;
-    const rh = nh * 0.155;
-    const scale = Math.min(3, Math.max(2, Math.ceil(window.devicePixelRatio || 1)));
-
-    workerCanvas.width = Math.max(1, Math.round(rw * scale));
-    workerCanvas.height = Math.max(1, Math.round(rh * scale));
-
-    ctx.clearRect(0, 0, workerCanvas.width, workerCanvas.height);
-    ctx.imageSmoothingEnabled = true;
-    ctx.imageSmoothingQuality = 'high';
-    ctx.filter = 'brightness(1.12) contrast(1.08) saturate(1.1)';
-    ctx.drawImage(image, rx, ry, rw, rh, 0, 0, workerCanvas.width, workerCanvas.height);
-    ctx.filter = 'none';
-  },
-
-  setPremiumGalleryWorkerAnimation(value) {
-    const workerCanvas = document.getElementById('uploadWorkerCanvas');
-    if (!workerCanvas) return;
-
-    workerCanvas.style.animation = 'none';
-    void workerCanvas.offsetWidth;
-    workerCanvas.style.animation = value;
-  },
-
-  resetPremiumGalleryWorker() {
-    clearTimeout(this._galleryWorkerResetTimer);
-    this.setPremiumGalleryWorkerAnimation('premiumGalleryWorkerIdle 2.4s ease-in-out infinite');
-  },
-
-  triggerPremiumGalleryButtonFx() {
-    const flash = document.getElementById('uploadCtaFlash');
-    if (flash) {
-      flash.classList.remove('fire');
-      void flash.offsetWidth;
-      flash.classList.add('fire');
-    }
-
-    if (this.prefersReducedMotion()) return;
-
-    this.setPremiumGalleryWorkerAnimation('premiumGalleryWorkerClick 0.42s cubic-bezier(.34,1.56,.64,1) forwards');
-    clearTimeout(this._galleryWorkerResetTimer);
-    this._galleryWorkerResetTimer = window.setTimeout(() => {
-      this.setPremiumGalleryWorkerAnimation('premiumGalleryWorkerIdle 2.4s ease-in-out infinite');
-    }, 480);
-    this.spawnPremiumGalleryParticles(14, true);
-  },
-
-  spawnPremiumGalleryParticles(count, burst) {
-    const btn = document.getElementById('uploadCta');
-    if (!btn || this.prefersReducedMotion()) return;
-
-    const colors = ['#ffe066', '#fff5a0', '#ffc030', '#ffe8a0', '#ffffff', '#ffcc44'];
-    const width = Math.max(btn.clientWidth, 170);
-    const height = Math.max(btn.clientHeight, 220);
-
-    for (let i = 0; i < count; i++) {
-      const particle = document.createElement('span');
-      const size = burst ? (2 + Math.random() * 4) : (1.5 + Math.random() * 2);
-      const x = 14 + Math.random() * Math.max(20, width - 28);
-      const y = burst
-        ? (10 + Math.random() * Math.max(60, height - 24))
-        : (10 + Math.random() * Math.max(36, height * 0.68));
-      const sx = (Math.random() - 0.5) * (burst ? 55 : 28);
-      const sy = -(Math.random() * (burst ? 48 : 24) + 8);
-      const duration = (burst ? 0.55 : 0.75) + Math.random() * 0.35;
-      const delay = i * (burst ? 0.04 : 0.12);
-      const color = colors[Math.floor(Math.random() * colors.length)];
-
-      particle.className = 'premium-gallery-spark';
-      particle.style.left = `${x}px`;
-      particle.style.top = `${y}px`;
-      particle.style.width = `${size}px`;
-      particle.style.height = `${size}px`;
-      particle.style.background = color;
-      particle.style.boxShadow = `0 0 ${size * 2}px ${color}`;
-      particle.style.setProperty('--sx', `${sx}px`);
-      particle.style.setProperty('--sy', `${sy}px`);
-      particle.style.animation = `premiumGallerySparkFly ${duration}s ease-out ${delay}s forwards`;
-
-      btn.appendChild(particle);
-      window.setTimeout(() => particle.remove(), (duration + delay) * 1000 + 100);
-    }
+    syncPlayback();
   },
 
   // ==========================================
@@ -1108,6 +1009,8 @@ const DalyApp = {
     this.setText('btnCopy', `📋 ${t.btnCopy}`);
     this.setText('btnShare', `🔗 ${t.btnShare}`);
     this.setText('btnReset', `♻️ ${t.btnReset}`);
+    this.setText('btnDownloadLabel', t.btnDownload);
+    document.getElementById('btnDownload')?.setAttribute('aria-label', t.btnDownload);
     
     // Output idle state
     if (!this.lastResult) {
@@ -1764,8 +1667,17 @@ const DalyApp = {
     }
     
     preview.classList.add('show');
+    document.getElementById('btnDownload')?.removeAttribute('disabled');
+
+    // Switch scout card to image state
+    const scoutCard = document.getElementById('scoutCard');
+    const scoutImg  = document.getElementById('scoutImg');
+    if (scoutCard && scoutImg) {
+      scoutImg.src = url;
+      scoutCard.classList.add('has-image');
+    }
   },
-  
+
   clearUploadPreview() {
     const preview = document.getElementById('uploadPreview');
     const thumb = document.getElementById('uploadThumb');
@@ -1785,6 +1697,15 @@ const DalyApp = {
     this._previewObjectUrl = '';
 
     this.setUploadStatus('empty');
+    document.getElementById('btnDownload')?.setAttribute('disabled', '');
+
+    // Reset scout card to video state
+    const scoutCard = document.getElementById('scoutCard');
+    const scoutImg  = document.getElementById('scoutImg');
+    if (scoutCard && scoutImg) {
+      scoutImg.src = '';
+      scoutCard.classList.remove('has-image');
+    }
   },
   
   // ==========================================
@@ -2298,6 +2219,19 @@ const DalyApp = {
     }
   },
   
+  // ==========================================
+  // DOWNLOAD UPLOADED IMAGE
+  // ==========================================
+  downloadUploadedImage() {
+    const thumb = document.getElementById('uploadThumb');
+    if (!thumb || !thumb.src || thumb.src === window.location.href) return;
+
+    const a = document.createElement('a');
+    a.href = thumb.src;
+    a.download = 'scout-report.png';
+    a.click();
+  },
+
   // ==========================================
   // RESET
   // ==========================================
