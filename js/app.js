@@ -1203,26 +1203,20 @@ const DalyApp = {
       // Candidate bands where the three troop totals usually live.
       // These are relative to the full screenshot size.
       const bands = [
-        { y0: 0.20, y1: 0.32 },
-        { y0: 0.24, y1: 0.36 },
-        { y0: 0.28, y1: 0.40 },
+        { y0: 0.38, y1: 0.48 },
+        { y0: 0.40, y1: 0.50 },
+        { y0: 0.42, y1: 0.52 },
+        { y0: 0.44, y1: 0.54 },
+        { y0: 0.46, y1: 0.56 },
+        { y0: 0.48, y1: 0.58 },
+        { y0: 0.50, y1: 0.60 },
+        { y0: 0.52, y1: 0.62 },
+        { y0: 0.54, y1: 0.64 },
+        { y0: 0.56, y1: 0.66 },
+        { y0: 0.30, y1: 0.42 },
         { y0: 0.32, y1: 0.44 },
         { y0: 0.34, y1: 0.46 },
-        { y0: 0.36, y1: 0.48 },
-        { y0: 0.38, y1: 0.50 },
-        { y0: 0.40, y1: 0.52 },
-        { y0: 0.42, y1: 0.54 },
-        { y0: 0.44, y1: 0.56 },
-        { y0: 0.46, y1: 0.58 },
-        { y0: 0.48, y1: 0.60 },
-        { y0: 0.50, y1: 0.62 },
-        { y0: 0.52, y1: 0.64 },
-        { y0: 0.54, y1: 0.66 },
-        { y0: 0.56, y1: 0.68 },
-        { y0: 0.58, y1: 0.70 },
-        { y0: 0.60, y1: 0.72 },
-        { y0: 0.62, y1: 0.74 },
-        { y0: 0.65, y1: 0.77 }
+        { y0: 0.36, y1: 0.46 }
       ];
 
       // Three columns (left / middle / right). Mapping for scout screenshots:
@@ -1277,19 +1271,38 @@ const DalyApp = {
         // Prefer bands that produce 3 clean tokens.
         bandScore += hitCount * 1000;
 
-        // Penalize cases where the middle value looks like a TOTAL (approximately left+right).
-        // This happens on some report layouts where the total troop count sits just above the 3 icons row.
+        // Penalize cases where ANY single value looks like a TOTAL.
+        // In this game, "إجمالي القوات" row shows one big number = sum of all troops.
         const absLeft = this._absFromKmv(picked.left);
         const absMid = this._absFromKmv(picked.mid);
         const absRight = this._absFromKmv(picked.right);
+
+        // Case 1: middle value ≈ left + right (classic total row)
         if (absLeft > 0 && absRight > 0 && absMid > 0 && absMid > absLeft && absMid > absRight) {
           const sumLR = absLeft + absRight;
           if (sumLR > 0) {
             const relDiff = Math.abs(absMid - sumLR) / sumLR;
-            if (relDiff < 0.25) {
-              bandScore -= 900;
+            if (relDiff < 0.30) {
+              bandScore -= 2000; // stronger penalty
             }
           }
+        }
+
+        // Case 2: only one column has a value and it's very large (إجمالي القوات row)
+        const nonZero = [absLeft, absMid, absRight].filter(n => n > 0);
+        if (nonZero.length === 1 && nonZero[0] > 500000) {
+          bandScore -= 3000;
+        }
+
+        // Case 3: middle is 0 but left and right exist - valid scout row
+        if (absLeft > 0 && absRight > 0 && absMid === 0) {
+          bandScore += 500; // bonus for valid scout row with 0 snipers
+        }
+
+        // Case 4: reward bands where all 3 values are plausible troop counts
+        const allThree = [absLeft, absMid, absRight].filter(n => n >= 0 && n <= 50000000);
+        if (allThree.length === 3 && nonZero.length >= 2) {
+          bandScore += 800;
         }
 
         // Plausibility bonus: typical totals are >= 10k and <= 50m.
@@ -1522,17 +1535,38 @@ const DalyApp = {
     const s = String(token || '')
       .trim()
       .toLowerCase()
-      .replace(/,/g, '.');
+      .replace(/,/g, '.')
+      .replace(/\s+/g, '');
     if (s === '0' || s === '0.' || s === '0.0' || s === '0.00') return '0';
-    const m = s.match(/^(\d+(?:\.\d+)?)([km])$/);
+
+    // Fix common OCR errors: "21m" when it should be "2.1m"
+    // If integer >= 10 with 'm' suffix and >= 10m, likely a misread decimal
+    // e.g. "21m" -> check if "2.1m" is more plausible (game max ~50m troops)
+    let fixed_s = s;
+    const bigM = s.match(/^(\d{2,})(m)$/);
+    if (bigM) {
+      const n = parseFloat(bigM[1]);
+      // If number >= 10 and no decimal, try inserting decimal after first digit
+      if (n >= 10 && n <= 999) {
+        const withDec = (n / 10).toFixed(1) + 'm';
+        const absOrig = n * 1000000;
+        const absDec = (n / 10) * 1000000;
+        // Prefer decimal version if original > 50m (unlikely troop count)
+        if (absOrig > 50000000 && absDec <= 50000000) {
+          fixed_s = withDec;
+        }
+      }
+    }
+
+    const m = fixed_s.match(/^(\d+(?:\.\d+)?)([km])$/);
     if (!m) return '';
     const n = parseFloat(m[1]);
     if (!isFinite(n) || n <= 0) return '';
     const suf = m[2];
 
     // Keep up to 1 decimal, strip trailing .0
-    const fixed = n.toFixed(1);
-    const cleaned = fixed.endsWith('.0') ? fixed.slice(0, -2) : fixed;
+    const fixedNum = n.toFixed(1);
+    const cleaned = fixedNum.endsWith('.0') ? fixedNum.slice(0, -2) : fixedNum;
     return cleaned + suf;
   },
 
