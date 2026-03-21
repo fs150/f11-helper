@@ -1188,9 +1188,12 @@ const DalyApp = {
     try {
       worker = await Tesseract.createWorker('eng');
       await worker.setParameters({
-        tessedit_char_whitelist: '0123456789.kKmM',
-        // Treat crop as a single block of text
-        tessedit_pageseg_mode: '6'
+        tessedit_char_whitelist: '0123456789.kKmM ,',
+        // Single uniform block of text
+        tessedit_pageseg_mode: '6',
+        // Improve accuracy
+        tessedit_ocr_engine_mode: '1',
+        preserve_interword_spaces: '1'
       });
 
       const bmp = await this._loadImageBitmap(file);
@@ -1200,6 +1203,9 @@ const DalyApp = {
       // Candidate bands where the three troop totals usually live.
       // These are relative to the full screenshot size.
       const bands = [
+        { y0: 0.20, y1: 0.32 },
+        { y0: 0.24, y1: 0.36 },
+        { y0: 0.28, y1: 0.40 },
         { y0: 0.32, y1: 0.44 },
         { y0: 0.34, y1: 0.46 },
         { y0: 0.36, y1: 0.48 },
@@ -1212,15 +1218,19 @@ const DalyApp = {
         { y0: 0.50, y1: 0.62 },
         { y0: 0.52, y1: 0.64 },
         { y0: 0.54, y1: 0.66 },
-        { y0: 0.56, y1: 0.68 }
+        { y0: 0.56, y1: 0.68 },
+        { y0: 0.58, y1: 0.70 },
+        { y0: 0.60, y1: 0.72 },
+        { y0: 0.62, y1: 0.74 },
+        { y0: 0.65, y1: 0.77 }
       ];
 
       // Three columns (left / middle / right). Mapping for scout screenshots:
       // left = Fighters, middle = Snipers, right = Cavalry.
       const cols = [
-        { name: 'left', x0: 0.05, x1: 0.36 },
-        { name: 'mid', x0: 0.33, x1: 0.67 },
-        { name: 'right', x0: 0.64, x1: 0.95 }
+        { name: 'left',  x0: 0.03, x1: 0.37 },
+        { name: 'mid',   x0: 0.32, x1: 0.68 },
+        { name: 'right', x0: 0.63, x1: 0.97 }
       ];
 
       let best = null;
@@ -1287,7 +1297,7 @@ const DalyApp = {
           .map((k) => this._absFromKmv(picked[k]))
           .filter((n) => typeof n === 'number' && isFinite(n) && n > 0);
         if (absVals.length >= 2) {
-          const ok = absVals.filter((n) => n >= 10000 && n <= 50000000).length;
+          const ok = absVals.filter((n) => n >= 5000 && n <= 100000000).length;
           bandScore += ok * 200;
         }
 
@@ -1364,7 +1374,7 @@ const DalyApp = {
     }
   },
 
-  _makeOcrCropCanvas(source, sx, sy, sw, sh, scale = 2) {
+  _makeOcrCropCanvas(source, sx, sy, sw, sh, scale = 3) {
     const cw = Math.max(1, Math.round(sw * scale));
     const ch = Math.max(1, Math.round(sh * scale));
     const canvas = document.createElement('canvas');
@@ -1380,7 +1390,7 @@ const DalyApp = {
     try {
       const imgData = ctx.getImageData(0, 0, cw, ch);
       const d = imgData.data;
-      const contrast = 1.35;
+      const contrast = 1.8; // Increased for better OCR on game screenshots
       for (let i = 0; i < d.length; i += 4) {
         const r = d[i];
         const g = d[i + 1];
