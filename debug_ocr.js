@@ -2,7 +2,7 @@ const puppeteer = require('puppeteer');
 const path = require('path');
 
 const SITE_URL = 'http://localhost:3000/';
-const IMG_PATH = 'C:\\Users\\Admin\\Desktop\\px\\888.png';
+const IMG_PATH = 'C:\\Users\\Admin\\Desktop\\px\\999.png';
 
 async function main() {
   const browser = await puppeteer.launch({
@@ -39,7 +39,7 @@ async function main() {
 
   await new Promise(r => setTimeout(r, 1000));
 
-  console.log('\n📸 Uploading 888.png...');
+  console.log('\n📸 Uploading 999.png...');
   const fileInput = await page.$('#uploadInput');
   if (!fileInput) { console.log('❌ uploadInput not found!'); await browser.close(); return; }
   

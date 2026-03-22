@@ -1358,10 +1358,15 @@ const DalyApp = {
           cav: best.picked.right || ''
         };
 
-        // Require at least 2 values to accept crop-based OCR.
+        // Fill in missing values with '0' if at least 2 others exist
+        // This handles cases where 0 troops are hard for OCR to read
         const nonEmpty = [result.sni, result.inf, result.cav].filter(Boolean).length;
         if (nonEmpty >= 2) {
+          if (!result.sni) result.sni = '0';
+          if (!result.inf) result.inf = '0';
+          if (!result.cav) result.cav = '0';
           this._lastOcrDebug.chosen = { ...best, result };
+          console.log('[OCR-DEBUG] FINAL sni=' + result.sni + ' inf=' + result.inf + ' cav=' + result.cav);
           return result;
         }
       }
