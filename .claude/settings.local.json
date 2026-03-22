@@ -1,7 +1,11 @@
 {
   "permissions": {
     "allow": [
-      "Bash(git -C \"C:/Users/Admin/Desktop/F11/F11/F11 D\" status)"
+      "Bash(git -C \"C:/Users/Admin/Desktop/F11/F11/F11 D\" status)",
+      "Bash(dir:*)",
+      "Bash(powershell -Command \"Get-ChildItem 'C:\\\\Users\\\\Admin\\\\Desktop\\\\px' | Select-Object Name\")",
+      "Bash(node -e \"require\\(''playwright''\\); console.log\\(''playwright OK''\\)\")",
+      "Bash(echo \"EXIT:$?\")"
     ]
   }
 }

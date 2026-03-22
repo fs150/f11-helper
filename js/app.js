@@ -1159,16 +1159,32 @@ const DalyApp = {
   },
   
   async loadTesseract() {
-    return new Promise((resolve, reject) => {
-      const script = document.createElement('script');
-      script.src = 'https://unpkg.com/tesseract.js@5/dist/tesseract.min.js';
-      script.onload = () => {
-        this.tesseractLoaded = true;
-        resolve();
-      };
-      script.onerror = reject;
-      document.head.appendChild(script);
-    });
+    // Try multiple CDNs in order
+    const cdns = [
+      'https://unpkg.com/tesseract.js@5/dist/tesseract.min.js',
+      'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js',
+      'https://unpkg.com/tesseract.js@5.1.1/dist/tesseract.min.js'
+    ];
+
+    for (const src of cdns) {
+      try {
+        await new Promise((resolve, reject) => {
+          const script = document.createElement('script');
+          script.src = src;
+          script.onload = () => {
+            this.tesseractLoaded = true;
+            resolve();
+          };
+          script.onerror = () => reject(new Error('Failed: ' + src));
+          document.head.appendChild(script);
+        });
+        console.log('[OCR] Loaded Tesseract from:', src);
+        return; // success
+      } catch (e) {
+        console.warn('[OCR] CDN failed, trying next:', src);
+      }
+    }
+    throw new Error('All Tesseract CDNs failed');
   },
   
   async runOCR(file) {
@@ -1186,13 +1202,14 @@ const DalyApp = {
 
     let worker;
     try {
-      worker = await Tesseract.createWorker('eng');
+      // Use default createWorker - let Tesseract handle CDN selection
+      worker = await Tesseract.createWorker('eng', 1, {
+        logger: () => {}
+      });
+
       await worker.setParameters({
         tessedit_char_whitelist: '0123456789.kKmM ,',
-        // Single uniform block of text
         tessedit_pageseg_mode: '6',
-        // Improve accuracy
-        tessedit_ocr_engine_mode: '1',
         preserve_interword_spaces: '1'
       });
 
@@ -1296,13 +1313,23 @@ const DalyApp = {
 
         // Case 3: middle is 0 but left and right exist - valid scout row
         if (absLeft > 0 && absRight > 0 && absMid === 0) {
-          bandScore += 500; // bonus for valid scout row with 0 snipers
+          bandScore += 800; // strong bonus for valid scout row with 0 snipers
         }
 
         // Case 4: reward bands where all 3 values are plausible troop counts
         const allThree = [absLeft, absMid, absRight].filter(n => n >= 0 && n <= 50000000);
         if (allThree.length === 3 && nonZero.length >= 2) {
           bandScore += 800;
+        }
+
+        // Case 5: left == right (symmetric troop counts like 800k/0/800k)
+        if (absLeft > 0 && absRight > 0 && Math.abs(absLeft - absRight) / Math.max(absLeft, absRight) < 0.05) {
+          bandScore += 600; // bonus for symmetric valid troop row
+        }
+
+        // Case 6: penalize if all three values are identical and very small (noise)
+        if (absLeft > 0 && absLeft === absMid && absMid === absRight && absLeft < 100000) {
+          bandScore -= 1500;
         }
 
         // Plausibility bonus: typical totals are >= 10k and <= 50m.
@@ -1472,10 +1499,12 @@ const DalyApp = {
       let score = (Number(c.conf) || 0);
       if (abs === 0) score -= 10;
       if (abs >= 10000 && abs <= 30000000) score += 25;
-      if (abs >= 100000) score += 10;
+      if (abs >= 100000) score += 20; // stronger bonus for large valid counts
+      if (abs >= 500000) score += 20; // extra bonus for 500k+ (typical troop counts)
 
       // Prefer tokens that include a suffix already (always true here) and are not tiny.
-      if (abs > 0 && abs < 5000) score -= 30;
+      if (abs > 0 && abs < 5000) score -= 50; // stronger penalty for tiny values
+      if (abs > 0 && abs < 1000) score -= 100; // very strong penalty for < 1k
 
       if (!best || score > best.score) {
         best = { value: formatted, raw, conf: Number(c.conf) || 0, abs, score };
@@ -1540,19 +1569,17 @@ const DalyApp = {
     if (s === '0' || s === '0.' || s === '0.0' || s === '0.00') return '0';
 
     // Fix common OCR errors: "21m" when it should be "2.1m"
-    // If integer >= 10 with 'm' suffix and >= 10m, likely a misread decimal
-    // e.g. "21m" -> check if "2.1m" is more plausible (game max ~50m troops)
+    // Tesseract drops decimal: 2.1m -> 21m, 1.3m -> 13m
+    // Only fix 2-digit numbers NOT multiples of 10 (keep 10m,20m,30m as valid)
     let fixed_s = s;
-    const bigM = s.match(/^(\d{2,})(m)$/);
+    const bigM = s.match(/^(\d{2,3})(m)$/);
     if (bigM) {
       const n = parseFloat(bigM[1]);
-      // If number >= 10 and no decimal, try inserting decimal after first digit
-      if (n >= 10 && n <= 999) {
+      // Fix: 21->2.1, 13->1.3, 27->2.7 etc. NOT 10,20,30 (valid round numbers)
+      if (n >= 11 && n <= 99 && (n % 10 !== 0)) {
         const withDec = (n / 10).toFixed(1) + 'm';
-        const absOrig = n * 1000000;
         const absDec = (n / 10) * 1000000;
-        // Prefer decimal version if original > 50m (unlikely troop count)
-        if (absOrig > 50000000 && absDec <= 50000000) {
+        if (absDec >= 500000 && absDec <= 50000000) {
           fixed_s = withDec;
         }
       }

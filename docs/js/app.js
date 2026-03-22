@@ -1159,16 +1159,32 @@ const DalyApp = {
   },
   
   async loadTesseract() {
-    return new Promise((resolve, reject) => {
-      const script = document.createElement('script');
-      script.src = 'https://unpkg.com/tesseract.js@5/dist/tesseract.min.js';
-      script.onload = () => {
-        this.tesseractLoaded = true;
-        resolve();
-      };
-      script.onerror = reject;
-      document.head.appendChild(script);
-    });
+    // Try multiple CDNs in order
+    const cdns = [
+      'https://unpkg.com/tesseract.js@5/dist/tesseract.min.js',
+      'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js',
+      'https://unpkg.com/tesseract.js@5.1.1/dist/tesseract.min.js'
+    ];
+
+    for (const src of cdns) {
+      try {
+        await new Promise((resolve, reject) => {
+          const script = document.createElement('script');
+          script.src = src;
+          script.onload = () => {
+            this.tesseractLoaded = true;
+            resolve();
+          };
+          script.onerror = () => reject(new Error('Failed: ' + src));
+          document.head.appendChild(script);
+        });
+        console.log('[OCR] Loaded Tesseract from:', src);
+        return; // success
+      } catch (e) {
+        console.warn('[OCR] CDN failed, trying next:', src);
+      }
+    }
+    throw new Error('All Tesseract CDNs failed');
   },
   
   async runOCR(file) {
@@ -1186,11 +1202,15 @@ const DalyApp = {
 
     let worker;
     try {
-      worker = await Tesseract.createWorker('eng');
+      // Use default createWorker - let Tesseract handle CDN selection
+      worker = await Tesseract.createWorker('eng', 1, {
+        logger: () => {}
+      });
+
       await worker.setParameters({
-        tessedit_char_whitelist: '0123456789.kKmM',
-        // Treat crop as a single block of text
-        tessedit_pageseg_mode: '6'
+        tessedit_char_whitelist: '0123456789.kKmM ,',
+        tessedit_pageseg_mode: '6',
+        preserve_interword_spaces: '1'
       });
 
       const bmp = await this._loadImageBitmap(file);
@@ -1200,27 +1220,28 @@ const DalyApp = {
       // Candidate bands where the three troop totals usually live.
       // These are relative to the full screenshot size.
       const bands = [
+        { y0: 0.38, y1: 0.48 },
+        { y0: 0.40, y1: 0.50 },
+        { y0: 0.42, y1: 0.52 },
+        { y0: 0.44, y1: 0.54 },
+        { y0: 0.46, y1: 0.56 },
+        { y0: 0.48, y1: 0.58 },
+        { y0: 0.50, y1: 0.60 },
+        { y0: 0.52, y1: 0.62 },
+        { y0: 0.54, y1: 0.64 },
+        { y0: 0.56, y1: 0.66 },
+        { y0: 0.30, y1: 0.42 },
         { y0: 0.32, y1: 0.44 },
         { y0: 0.34, y1: 0.46 },
-        { y0: 0.36, y1: 0.48 },
-        { y0: 0.38, y1: 0.50 },
-        { y0: 0.40, y1: 0.52 },
-        { y0: 0.42, y1: 0.54 },
-        { y0: 0.44, y1: 0.56 },
-        { y0: 0.46, y1: 0.58 },
-        { y0: 0.48, y1: 0.60 },
-        { y0: 0.50, y1: 0.62 },
-        { y0: 0.52, y1: 0.64 },
-        { y0: 0.54, y1: 0.66 },
-        { y0: 0.56, y1: 0.68 }
+        { y0: 0.36, y1: 0.46 }
       ];
 
       // Three columns (left / middle / right). Mapping for scout screenshots:
       // left = Fighters, middle = Snipers, right = Cavalry.
       const cols = [
-        { name: 'left', x0: 0.05, x1: 0.36 },
-        { name: 'mid', x0: 0.33, x1: 0.67 },
-        { name: 'right', x0: 0.64, x1: 0.95 }
+        { name: 'left',  x0: 0.03, x1: 0.37 },
+        { name: 'mid',   x0: 0.32, x1: 0.68 },
+        { name: 'right', x0: 0.63, x1: 0.97 }
       ];
 
       let best = null;
@@ -1267,19 +1288,48 @@ const DalyApp = {
         // Prefer bands that produce 3 clean tokens.
         bandScore += hitCount * 1000;
 
-        // Penalize cases where the middle value looks like a TOTAL (approximately left+right).
-        // This happens on some report layouts where the total troop count sits just above the 3 icons row.
+        // Penalize cases where ANY single value looks like a TOTAL.
+        // In this game, "إجمالي القوات" row shows one big number = sum of all troops.
         const absLeft = this._absFromKmv(picked.left);
         const absMid = this._absFromKmv(picked.mid);
         const absRight = this._absFromKmv(picked.right);
+
+        // Case 1: middle value ≈ left + right (classic total row)
         if (absLeft > 0 && absRight > 0 && absMid > 0 && absMid > absLeft && absMid > absRight) {
           const sumLR = absLeft + absRight;
           if (sumLR > 0) {
             const relDiff = Math.abs(absMid - sumLR) / sumLR;
-            if (relDiff < 0.25) {
-              bandScore -= 900;
+            if (relDiff < 0.30) {
+              bandScore -= 2000; // stronger penalty
             }
           }
+        }
+
+        // Case 2: only one column has a value and it's very large (إجمالي القوات row)
+        const nonZero = [absLeft, absMid, absRight].filter(n => n > 0);
+        if (nonZero.length === 1 && nonZero[0] > 500000) {
+          bandScore -= 3000;
+        }
+
+        // Case 3: middle is 0 but left and right exist - valid scout row
+        if (absLeft > 0 && absRight > 0 && absMid === 0) {
+          bandScore += 800; // strong bonus for valid scout row with 0 snipers
+        }
+
+        // Case 4: reward bands where all 3 values are plausible troop counts
+        const allThree = [absLeft, absMid, absRight].filter(n => n >= 0 && n <= 50000000);
+        if (allThree.length === 3 && nonZero.length >= 2) {
+          bandScore += 800;
+        }
+
+        // Case 5: left == right (symmetric troop counts like 800k/0/800k)
+        if (absLeft > 0 && absRight > 0 && Math.abs(absLeft - absRight) / Math.max(absLeft, absRight) < 0.05) {
+          bandScore += 600; // bonus for symmetric valid troop row
+        }
+
+        // Case 6: penalize if all three values are identical and very small (noise)
+        if (absLeft > 0 && absLeft === absMid && absMid === absRight && absLeft < 100000) {
+          bandScore -= 1500;
         }
 
         // Plausibility bonus: typical totals are >= 10k and <= 50m.
@@ -1287,7 +1337,7 @@ const DalyApp = {
           .map((k) => this._absFromKmv(picked[k]))
           .filter((n) => typeof n === 'number' && isFinite(n) && n > 0);
         if (absVals.length >= 2) {
-          const ok = absVals.filter((n) => n >= 10000 && n <= 50000000).length;
+          const ok = absVals.filter((n) => n >= 5000 && n <= 100000000).length;
           bandScore += ok * 200;
         }
 
@@ -1364,7 +1414,7 @@ const DalyApp = {
     }
   },
 
-  _makeOcrCropCanvas(source, sx, sy, sw, sh, scale = 2) {
+  _makeOcrCropCanvas(source, sx, sy, sw, sh, scale = 3) {
     const cw = Math.max(1, Math.round(sw * scale));
     const ch = Math.max(1, Math.round(sh * scale));
     const canvas = document.createElement('canvas');
@@ -1380,7 +1430,7 @@ const DalyApp = {
     try {
       const imgData = ctx.getImageData(0, 0, cw, ch);
       const d = imgData.data;
-      const contrast = 1.35;
+      const contrast = 1.8; // Increased for better OCR on game screenshots
       for (let i = 0; i < d.length; i += 4) {
         const r = d[i];
         const g = d[i + 1];
@@ -1449,10 +1499,12 @@ const DalyApp = {
       let score = (Number(c.conf) || 0);
       if (abs === 0) score -= 10;
       if (abs >= 10000 && abs <= 30000000) score += 25;
-      if (abs >= 100000) score += 10;
+      if (abs >= 100000) score += 20; // stronger bonus for large valid counts
+      if (abs >= 500000) score += 20; // extra bonus for 500k+ (typical troop counts)
 
       // Prefer tokens that include a suffix already (always true here) and are not tiny.
-      if (abs > 0 && abs < 5000) score -= 30;
+      if (abs > 0 && abs < 5000) score -= 50; // stronger penalty for tiny values
+      if (abs > 0 && abs < 1000) score -= 100; // very strong penalty for < 1k
 
       if (!best || score > best.score) {
         best = { value: formatted, raw, conf: Number(c.conf) || 0, abs, score };
@@ -1512,17 +1564,36 @@ const DalyApp = {
     const s = String(token || '')
       .trim()
       .toLowerCase()
-      .replace(/,/g, '.');
+      .replace(/,/g, '.')
+      .replace(/\s+/g, '');
     if (s === '0' || s === '0.' || s === '0.0' || s === '0.00') return '0';
-    const m = s.match(/^(\d+(?:\.\d+)?)([km])$/);
+
+    // Fix common OCR errors: "21m" when it should be "2.1m"
+    // Tesseract drops decimal: 2.1m -> 21m, 1.3m -> 13m
+    // Only fix 2-digit numbers NOT multiples of 10 (keep 10m,20m,30m as valid)
+    let fixed_s = s;
+    const bigM = s.match(/^(\d{2,3})(m)$/);
+    if (bigM) {
+      const n = parseFloat(bigM[1]);
+      // Fix: 21->2.1, 13->1.3, 27->2.7 etc. NOT 10,20,30 (valid round numbers)
+      if (n >= 11 && n <= 99 && (n % 10 !== 0)) {
+        const withDec = (n / 10).toFixed(1) + 'm';
+        const absDec = (n / 10) * 1000000;
+        if (absDec >= 500000 && absDec <= 50000000) {
+          fixed_s = withDec;
+        }
+      }
+    }
+
+    const m = fixed_s.match(/^(\d+(?:\.\d+)?)([km])$/);
     if (!m) return '';
     const n = parseFloat(m[1]);
     if (!isFinite(n) || n <= 0) return '';
     const suf = m[2];
 
     // Keep up to 1 decimal, strip trailing .0
-    const fixed = n.toFixed(1);
-    const cleaned = fixed.endsWith('.0') ? fixed.slice(0, -2) : fixed;
+    const fixedNum = n.toFixed(1);
+    const cleaned = fixedNum.endsWith('.0') ? fixedNum.slice(0, -2) : fixedNum;
     return cleaned + suf;
   },
 
