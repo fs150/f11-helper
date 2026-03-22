@@ -3,8 +3,8 @@
  * Provides offline functionality and caching
  */
 
-const CACHE_NAME = 'daly-alpha-v3';
-const STATIC_CACHE = 'daly-static-v3';
+const CACHE_NAME = 'daly-alpha-v4';
+const STATIC_CACHE = 'daly-static-v4';
 
 // Files to cache immediately
 const STATIC_FILES = [
